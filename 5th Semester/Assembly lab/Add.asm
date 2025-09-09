@@ -1,4 +1,4 @@
-                                ; Add two number
+                              ; Add two number
 .model small
 .stack 100h
 .data

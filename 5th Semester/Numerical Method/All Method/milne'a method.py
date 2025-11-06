@@ -40,5 +40,5 @@ def milne_method(x0, y0, x1, y1, x2, y2, x3, y3, x4, h=x1-x0):
     y4_corr = y2 + (h / 3) * (f(x2, y2) + 4 * f(x3, y3) + f(x4, y4_pred))
     return y4_corr
 
-y4_milne = milne_method(x0, y0, x1, y1, x2, y2, x3, y3, x4=x3 + (x1 - x0))
+y4_milne = milne_method(x0, y0, x1, y1, x2, y2, x3, y3, x4=x3 + h)
 print(f"y4 from Milne's method: {y4_milne}")

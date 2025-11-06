@@ -4,48 +4,41 @@ import matplotlib.pyplot as plt
 def f(x, y):
     return x + y  
 
-h = 0.1
-x = np.arange(0, 1+h, h)
-y = np.zeros(len(x))
+x0=0
+y0=1
+h=0.1
+xn=10
 
-y[0] = 1
+x_values=[x0]
+y_values=[y0]
 
-def rk4_step(xn, yn, h):
-    k1 = h * f(xn, yn)
-    k2 = h * f(xn + h/2, yn + k1/2)
-    k3 = h * f(xn + h/2, yn + k2/2)
-    k4 = h * f(xn + h, yn + k3)
-    return yn + (k1 + 2*k2 + 2*k3 + k4)/6
+n=0
 
-for i in range(3):
-    y[i+1] = rk4_step(x[i], y[i], h)
+while x0<xn:
+    x0 +=h
+    k1=h*f(x0,y0)
+    k2=h*f(x0+h/2,y0+k1/2)
+    k3=h*f(x0+h/2,y0+k2/2)
+    k4=h*f(x0+h,y0+k3)
 
-for i in range(3, len(x)-1):
-    f0 = f(x[i-3], y[i-3])
-    f1 = f(x[i-2], y[i-2])
-    f2 = f(x[i-1], y[i-1])
-    f3 = f(x[i], y[i])
-    
-    yp = y[i-3] + (4*h/3)*(2*f3 - f2 + 2*f1)
-    
-    f4 = f(x[i+1], yp)
-    y[i+1] = y[i-1] + (h/3)*(f4 + 4*f3 + f2)
+    y0 += (k1+2*k2+2*k3+k4)/6
 
-print(y)
+    x_values.append(x0)
+    y_values.append(y0)
+    n +=1
 
 
-h = 0.1
-x = np.arange(0, 1+h, h)
-y = np.array([1.0, 1.11034167, 1.24280514, 1.39971699,
-              1.58364897, 1.79744188, 2.04423710, 2.32750471,
-              2.65108129, 3.01920546, 3.43656303])
+x0, y0 = x_values[0], y_values[0]
+x1, y1 = x_values[1], y_values[1]
+x2, y2 = x_values[2], y_values[2]
+x3, y3 = x_values[3], y_values[3]
 
-# Plot
-plt.figure(figsize=(8,5))
-plt.plot(x, y, 'o-', label="Milne Predictor-Corrector", color='blue')
-plt.title("Numerical Solution of y' = x + y using Milne's Method")
-plt.xlabel("x")
-plt.ylabel("y")
-plt.grid(True)
-plt.legend()
-plt.show()
+def milne_method(x0, y0, x1, y1, x2, y2, x3, y3, x4, h=x1-x0):
+    # Predictor
+    y4_pred = y0 + (4 * h / 3) * (2 * f(x3, y3) - f(x2, y2) + 2 * f(x1, y1))
+    # Corrector
+    y4_corr = y2 + (h / 3) * (f(x2, y2) + 4 * f(x3, y3) + f(x4, y4_pred))
+    return y4_corr
+
+y4_milne = milne_method(x0, y0, x1, y1, x2, y2, x3, y3, x4=x3 + (x1 - x0))
+print(f"y4 from Milne's method: {y4_milne}")

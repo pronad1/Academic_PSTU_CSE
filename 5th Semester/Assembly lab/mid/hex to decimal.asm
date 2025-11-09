@@ -44,8 +44,6 @@ main proc
     int 21h
     mov dl,0Dh
     int 21h
-   
-    
            
     
     exit:

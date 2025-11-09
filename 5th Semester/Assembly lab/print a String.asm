@@ -1,7 +1,7 @@
 .MODEL SMALL 
 .STACK 100H     
 .DATA
-msg DB 'Md. Rakibul Islam$'   
+msg DB 'I am Prosenjit Mondol$'   
              
 .CODE 
  

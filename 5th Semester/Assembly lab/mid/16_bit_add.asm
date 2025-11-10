@@ -8,8 +8,5 @@ main proc
     
     add ax,bx
     
-    exit:
-    mov bx,4ch
-    int 21h
     main endp
 end main

@@ -9,9 +9,5 @@ main proc
     
     mul bx
     
-    exit:
-    mov bx,4ch
-    int 21h
-    
     main endp
 end main

@@ -1,93 +1,93 @@
 """
-DECISION TREE - Simple Implementation for Final Exam
-Dataset: Buy Computer (Age, Income, Student, Credit -> Buy)
-Algorithm: ID3 using Information Gain
+DECISION TREE - Super Simple for Final Exam
+Dataset: Play Outside (Weather + Temperature -> Play)
 """
 
 import math
 
-# Dataset: Will customer buy a computer?
+# Simple Dataset
 data = [
-    ['Young', 'High', 'No', 'Fair', 'No'],
-    ['Young', 'High', 'No', 'Good', 'No'],
-    ['Middle', 'High', 'No', 'Fair', 'Yes'],
-    ['Senior', 'Medium', 'No', 'Fair', 'Yes'],
-    ['Senior', 'Low', 'Yes', 'Fair', 'Yes'],
-    ['Senior', 'Low', 'Yes', 'Good', 'No'],
-    ['Middle', 'Low', 'Yes', 'Good', 'Yes'],
-    ['Young', 'Medium', 'No', 'Fair', 'No'],
-    ['Young', 'Low', 'Yes', 'Fair', 'Yes'],
-    ['Senior', 'Medium', 'Yes', 'Fair', 'Yes']
+    ['Sunny', 'Hot', 'No'],
+    ['Sunny', 'Cool', 'Yes'],
+    ['Rainy', 'Cool', 'No'],
+    ['Rainy', 'Hot', 'No'],
+    ['Cloudy', 'Hot', 'Yes'],
+    ['Cloudy', 'Cool', 'Yes']
 ]
 
-attributes = ['Age', 'Income', 'Student', 'Credit', 'Buy']
+attributes = ['Weather', 'Temperature', 'Play']
 
 # Calculate entropy
-def entropy(data, target_idx):
+def entropy(rows):
+    total = len(rows)
     counts = {}
-    for row in data:
-        label = row[target_idx]
+    for row in rows:
+        label = row[-1]  # Last column is target
         counts[label] = counts.get(label, 0) + 1
     
     ent = 0
-    total = len(data)
     for count in counts.values():
         p = count / total
         ent -= p * math.log2(p)
     return ent
 
 # Calculate information gain
-def info_gain(data, attr_idx, target_idx):
-    total_ent = entropy(data, target_idx)
+def info_gain(rows, col):
+    total_ent = entropy(rows)
     
-    # Split by attribute
+    # Split data by column value
     splits = {}
-    for row in data:
-        val = row[attr_idx]
+    for row in rows:
+        val = row[col]
         if val not in splits:
             splits[val] = []
         splits[val].append(row)
     
-    # Weighted entropy
-    weighted_ent = 0
+    # Calculate weighted entropy
+    weighted = 0
     for subset in splits.values():
-        weighted_ent += (len(subset) / len(data)) * entropy(subset, target_idx)
+        weighted += (len(subset) / len(rows)) * entropy(subset)
     
-    return total_ent - weighted_ent
+    return total_ent - weighted
 
-# Build decision tree
-def build_tree(data, attrs, target='Buy'):
-    target_idx = attrs.index(target)
-    labels = [row[target_idx] for row in data]
+# Build tree
+def build_tree(rows, attrs):
+    labels = [row[-1] for row in rows]
     
-    # All same label
+    # If all same, return label
     if len(set(labels)) == 1:
         return labels[0]
     
-    # No more attributes
+    # If no attributes left, return most common
     if len(attrs) == 1:
         return max(set(labels), key=labels.count)
     
     # Find best attribute
-    best_attr = None
-    best_gain = -1
-    for i, attr in enumerate(attrs):
-        if attr != target:
-            gain = info_gain(data, i, target_idx)
-            if gain > best_gain:
-                best_gain = gain
-                best_attr = attr
+    best_col = 0
+    best_gain = 0
+    for i in range(len(attrs) - 1):  # Exclude target
+        gain = info_gain(rows, i)
+        if gain > best_gain:
+            best_gain = gain
+            best_col = i
     
-    # Create tree
-    tree = {best_attr: {}}
-    best_idx = attrs.index(best_attr)
+    # Build tree
+    tree = {attrs[best_col]: {}}
     
-    # Build subtrees
-    values = set(row[best_idx] for row in data)
-    for val in values:
-        subset = [row for row in data if row[best_idx] == val]
-        new_attrs = [a for a in attrs if a != best_attr]
-        tree[best_attr][val] = build_tree(subset, new_attrs, target)
+    # Split by best attribute
+    splits = {}
+    for row in rows:
+        val = row[best_col]
+        if val not in splits:
+            splits[val] = []
+        splits[val].append(row)
+    
+    # Recursively build subtrees
+    for val, subset in splits.items():
+        # Remove used attribute
+        new_rows = [[row[i] for i in range(len(row)) if i != best_col] for row in subset]
+        new_attrs = [attrs[i] for i in range(len(attrs)) if i != best_col]
+        tree[attrs[best_col]][val] = build_tree(new_rows, new_attrs)
     
     return tree
 
@@ -102,20 +102,14 @@ def print_tree(tree, indent=''):
             print_tree(subtree, indent + '  ')
 
 # Main
-if __name__ == "__main__":
-    print("="*50)
-    print("DECISION TREE - Buy Computer Dataset")
-    print("="*50)
-    
-    print("\nDataset:")
-    print(attributes)
-    for i, row in enumerate(data, 1):
-        print(f"{i:2}. {row}")
-    
-    print("\n" + "="*50)
-    tree = build_tree(data, attributes)
-    
-    print("\nDecision Tree:")
-    print_tree(tree)
-    
-    print("\n" + "="*50)
+print("DECISION TREE - Play Outside")
+print("="*40)
+print("\nDataset:", attributes)
+for i, row in enumerate(data, 1):
+    print(f"{i}. {row}")
+
+print("\n" + "="*40)
+tree = build_tree(data, attributes)
+print("\nDecision Tree:")
+print_tree(tree)
+print("\n" + "="*40)

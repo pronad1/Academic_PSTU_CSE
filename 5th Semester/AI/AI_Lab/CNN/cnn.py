@@ -24,7 +24,7 @@ def clean_invalid_images_cv(directory):
                 os.remove(file_path)
                 removed += 1
                 print(f"⚠️ Problem reading: {file_path}")
-    print(f"\n🧹 Cleanup Done! Removed {removed} invalid images.\n")
+    print(f"\n Cleanup Done! Removed {removed} invalid images.\n")
 
 # Run cleanup on both train and test folders
 clean_invalid_images_cv(r"D:\Languages\Academic_PSTU_CSE\5th Semester\AI\AI_Lab\CNN\train")

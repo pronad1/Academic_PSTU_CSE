@@ -1,0 +1,5 @@
+This is a sample file for concurrent file server testing.
+Multiple clients can request files simultaneously.
+The server creates a separate thread for each client.
+Each thread handles file transfer independently.
+Transfer happens in 1000-byte chunks with 200ms sleep.

@@ -1,0 +1,7 @@
+This is a test file for FTP transfer.
+Line 2: Testing connectionless UDP transfer.
+Line 3: Testing connection-oriented TCP transfer.
+Line 4: Each line will be sent as a datagram in UDP.
+Line 5: TCP will send data in 100-byte chunks with ACK.
+Line 6: This demonstrates both protocols.
+Line 7: Final line of the test file.

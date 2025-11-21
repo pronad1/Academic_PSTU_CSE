@@ -539,7 +539,7 @@ The application features:
 
 ## 👨‍💻 Author
 
-**Your Name**  
+**Prosenjit Mondol**  
 Lab Project - 5th Semester  
 Date: November 21, 2025
 

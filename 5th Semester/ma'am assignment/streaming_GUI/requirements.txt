@@ -1,0 +1,12 @@
+# No external dependencies required
+# This project uses only Python standard library modules:
+# - tkinter (GUI)
+# - socket (networking)
+# - threading (concurrent operations)
+# - os (file operations)
+# - subprocess (launching media players)
+# - datetime (timestamps)
+# - random (packet size randomization)
+# - time (delays and timing)
+
+# Python 3.7 or higher is required

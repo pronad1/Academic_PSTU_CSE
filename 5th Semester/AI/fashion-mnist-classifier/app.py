@@ -255,7 +255,7 @@ if __name__ == '__main__':
     print("🚀 Fashion MNIST Classifier Starting...")
     print("📊 Model status:", "✅ Loaded" if model_loaded else "❌ Not loaded")
     if not model_loaded:
-        print("💡 To train model, run: python model/quick_train.py")
+        print("💡 To train model, run: python model/train_model.py")
     print("🌐 Web interface available at: http://localhost:5000")
     print("=" * 50)
     

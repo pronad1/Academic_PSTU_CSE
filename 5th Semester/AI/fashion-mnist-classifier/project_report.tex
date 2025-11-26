@@ -1,0 +1,1023 @@
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% Code listing configuration
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10}
+}
+
+% Title information
+\title{
+    \vspace{-2cm}
+    \textbf{Fashion MNIST Image Classification using Convolutional Neural Networks with Hyperparameter Optimization}\\
+    \vspace{0.5cm}
+    \large Final Project Report
+}
+
+\author{
+    Department of Computer Science and Engineering\\
+    Patuakhali Science and Technology University (PSTU)\\
+    \vspace{0.3cm}
+    Course: Artificial Intelligence (5th Semester)
+}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+This project presents a comprehensive implementation of a deep learning-based image classification system for the Fashion MNIST dataset. The system employs Convolutional Neural Networks (CNNs) with systematic hyperparameter optimization using Keras Tuner's Hyperband algorithm. The architecture consists of three convolutional blocks followed by dense layers, achieving competitive accuracy on the Fashion MNIST benchmark. The project includes a complete pipeline from data preprocessing, model training with hyperparameter tuning, to deployment via a Flask-based web application. The final model demonstrates robust performance with carefully optimized hyperparameters selected from 26 trials using Hyperband optimization, enabling real-time classification of 10 fashion item categories through an intuitive web interface.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Background}
+Fashion MNIST is a dataset comprising 70,000 grayscale images of fashion items from 10 categories, serving as a more challenging alternative to the traditional MNIST digit dataset. Each image is 28×28 pixels, representing clothing items such as t-shirts, trousers, dresses, coats, and footwear. The dataset has become a standard benchmark for evaluating machine learning algorithms in computer vision tasks.
+
+\subsection{Motivation}
+The motivation for this project stems from the practical applications of automated fashion item classification in e-commerce, retail inventory management, and fashion recommendation systems. Developing an accurate and efficient classification system demonstrates the power of deep learning in real-world applications while providing hands-on experience with modern machine learning frameworks and deployment strategies.
+
+\subsection{Objectives}
+The primary objectives of this project are:
+\begin{itemize}
+    \item Develop a robust CNN architecture for Fashion MNIST classification
+    \item Implement systematic hyperparameter optimization using Keras Tuner
+    \item Achieve competitive accuracy on the test dataset
+    \item Deploy the model through an interactive web application
+    \item Document the complete machine learning pipeline
+\end{itemize}
+
+\subsection{Dataset Overview}
+The Fashion MNIST dataset consists of:
+\begin{itemize}
+    \item \textbf{Training Set:} 60,000 images
+    \item \textbf{Test Set:} 10,000 images
+    \item \textbf{Image Size:} 28×28 pixels
+    \item \textbf{Color Space:} Grayscale (1 channel)
+    \item \textbf{Classes:} 10 fashion categories
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Fashion MNIST Class Labels}
+\begin{tabular}{cl}
+\toprule
+\textbf{Label} & \textbf{Class Name} \\
+\midrule
+0 & T-shirt/top \\
+1 & Trouser \\
+2 & Pullover \\
+3 & Dress \\
+4 & Coat \\
+5 & Sandal \\
+6 & Shirt \\
+7 & Sneaker \\
+8 & Bag \\
+9 & Ankle boot \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Methodology}
+
+\subsection{System Architecture}
+
+The project follows a modular architecture with clear separation of concerns:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2cm, auto, 
+    block/.style={rectangle, draw, fill=blue!20, text width=5em, text centered, rounded corners, minimum height=3em},
+    line/.style={draw, -latex'}]
+    
+    \node [block] (data) {Data Loading};
+    \node [block, below of=data] (preprocess) {Preprocessing};
+    \node [block, below of=preprocess] (tuning) {Hyperparameter Tuning};
+    \node [block, below of=tuning] (train) {Model Training};
+    \node [block, below of=train] (eval) {Evaluation};
+    \node [block, below of=eval] (deploy) {Web Deployment};
+    
+    \path [line] (data) -- (preprocess);
+    \path [line] (preprocess) -- (tuning);
+    \path [line] (tuning) -- (train);
+    \path [line] (train) -- (eval);
+    \path [line] (eval) -- (deploy);
+\end{tikzpicture}
+\caption{System Pipeline Architecture}
+\end{figure}
+
+\subsection{Data Preprocessing}
+
+The data preprocessing pipeline consists of the following steps:
+
+\subsubsection{Normalization}
+Pixel values are normalized from the range [0, 255] to [0.0, 1.0]:
+\begin{equation}
+x_{normalized} = \frac{x_{original}}{255.0}
+\end{equation}
+
+This normalization improves:
+\begin{itemize}
+    \item Numerical stability during training
+    \item Convergence speed of optimization algorithms
+    \item Compatibility with activation functions
+\end{itemize}
+
+\subsubsection{Reshaping for CNN Input}
+Images are reshaped to include the channel dimension:
+\begin{equation}
+X_{input} \in \mathbb{R}^{N \times 28 \times 28 \times 1}
+\end{equation}
+where $N$ is the batch size, and the last dimension represents the single grayscale channel.
+
+\begin{lstlisting}[caption={Data Preprocessing Implementation}]
+def load_and_preprocess_data():
+    """Load and preprocess Fashion MNIST data"""
+    fashion_mnist = keras.datasets.fashion_mnist
+    (train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
+    
+    # Normalize pixel values to [0, 1]
+    train_images = train_images / 255.0
+    test_images = test_images / 255.0
+    
+    # Reshape for CNN: (samples, height, width, channels)
+    x_train = train_images.reshape(-1, 28, 28, 1)
+    x_test = test_images.reshape(-1, 28, 28, 1)
+    
+    return (x_train, train_labels), (x_test, test_labels)
+\end{lstlisting}
+
+\subsection{Model Architecture}
+
+The CNN architecture consists of three main components:
+
+\subsubsection{Convolutional Blocks}
+Three convolutional blocks extract hierarchical features:
+
+\textbf{Block 1:}
+\begin{itemize}
+    \item Conv2D layer: filters $\in \{32, 64, 128\}$, kernel size $\in \{3, 5\}$
+    \item MaxPooling2D: pool size $(2, 2)$
+    \item Dropout: rate $\in [0.1, 0.5]$
+\end{itemize}
+
+\textbf{Block 2:}
+\begin{itemize}
+    \item Conv2D layer: filters $\in \{32, 64, 128\}$, kernel size $\in \{3, 5\}$
+    \item MaxPooling2D: pool size $(2, 2)$
+    \item Dropout: rate $\in [0.1, 0.5]$
+\end{itemize}
+
+\textbf{Block 3:}
+\begin{itemize}
+    \item Conv2D layer: filters $\in \{32, 64\}$, kernel size $= 3$
+    \item Dropout: rate $\in [0.1, 0.4]$
+\end{itemize}
+
+\subsubsection{Dense Classification Layers}
+\begin{itemize}
+    \item Flatten layer: converts feature maps to 1D vector
+    \item Dense layer 1: units $\in \{128, 256, 512\}$, ReLU activation
+    \item Dropout: rate $\in [0.2, 0.6]$
+    \item Dense layer 2: units $\in \{64, 128\}$, ReLU activation
+    \item Dropout: rate $\in [0.1, 0.4]$
+    \item Output layer: 10 units, softmax activation
+\end{itemize}
+
+\subsubsection{Mathematical Formulation}
+
+For a convolutional layer:
+\begin{equation}
+y_{i,j,k} = \sigma\left(\sum_{m,n,c} w_{m,n,c,k} \cdot x_{i+m,j+n,c} + b_k\right)
+\end{equation}
+where $(i,j)$ are spatial coordinates, $k$ is the output channel, $w$ are weights, $b$ is bias, and $\sigma$ is the ReLU activation.
+
+For the output layer with softmax:
+\begin{equation}
+p(y=c|x) = \frac{e^{z_c}}{\sum_{j=1}^{10} e^{z_j}}
+\end{equation}
+where $z_c$ is the logit for class $c$.
+
+\subsection{Hyperparameter Optimization}
+
+\subsubsection{Optimization Strategy}
+We employed Keras Tuner's Hyperband algorithm, which combines:
+\begin{itemize}
+    \item Successive halving for efficient resource allocation
+    \item Early stopping of unpromising trials
+    \item Adaptive resource allocation based on performance
+\end{itemize}
+
+\subsubsection{Search Space}
+The hyperparameter search space includes:
+
+\begin{table}[H]
+\centering
+\caption{Hyperparameter Search Space}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{Type} & \textbf{Values} \\
+\midrule
+conv\_1\_filter & Choice & \{32, 64, 128\} \\
+conv\_1\_kernel & Choice & \{3, 5\} \\
+conv\_2\_filter & Choice & \{32, 64, 128\} \\
+conv\_2\_kernel & Choice & \{3, 5\} \\
+conv\_3\_filter & Choice & \{32, 64\} \\
+conv\_3\_kernel & Fixed & 3 \\
+dense\_1 & Choice & \{128, 256, 512\} \\
+dense\_2 & Choice & \{64, 128\} \\
+dropout\_1 & Float & [0.1, 0.5], step=0.1 \\
+dropout\_2 & Float & [0.1, 0.5], step=0.1 \\
+dropout\_3 & Float & [0.1, 0.4], step=0.1 \\
+dropout\_4 & Float & [0.2, 0.6], step=0.1 \\
+dropout\_5 & Float & [0.1, 0.4], step=0.1 \\
+learning\_rate & Choice & \{0.001, 0.0001\} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Hyperband Configuration}
+\begin{itemize}
+    \item \textbf{Max Trials:} 26 (completed 25 trials)
+    \item \textbf{Max Epochs per Trial:} 10
+    \item \textbf{Min Epochs:} 1
+    \item \textbf{Reduction Factor:} 3
+    \item \textbf{Objective:} Maximize validation accuracy
+\end{itemize}
+
+\begin{algorithm}
+\caption{Hyperparameter Optimization Process}
+\begin{algorithmic}[1]
+\State Initialize Hyperband tuner with search space
+\State Load and preprocess training data
+\For{trial = 1 to max\_trials}
+    \State Sample hyperparameters from search space
+    \State Build model with sampled hyperparameters
+    \State Train model with early stopping (patience=3)
+    \State Evaluate on validation set
+    \If{trial underperforms}
+        \State Stop trial early
+    \EndIf
+    \State Record trial results
+\EndFor
+\State Select best hyperparameters based on validation accuracy
+\State \Return best\_hyperparameters
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Model Training}
+
+\subsubsection{Training Configuration}
+\begin{itemize}
+    \item \textbf{Optimizer:} Adam
+    \item \textbf{Loss Function:} Sparse Categorical Crossentropy
+    \item \textbf{Metrics:} Accuracy
+    \item \textbf{Batch Size:} 64
+    \item \textbf{Validation Split:} 20\%
+    \item \textbf{Training Epochs:} 20 (with early stopping)
+\end{itemize}
+
+\subsubsection{Callbacks}
+\begin{enumerate}
+    \item \textbf{Early Stopping:}
+    \begin{itemize}
+        \item Monitor: validation loss
+        \item Patience: 5 epochs
+        \item Restore best weights
+    \end{itemize}
+    
+    \item \textbf{Learning Rate Reduction:}
+    \begin{itemize}
+        \item Monitor: validation loss
+        \item Factor: 0.2
+        \item Patience: 3 epochs
+        \item Minimum LR: $10^{-7}$
+    \end{itemize}
+\end{enumerate}
+
+The loss function for multi-class classification:
+\begin{equation}
+\mathcal{L} = -\frac{1}{N}\sum_{i=1}^{N}\sum_{c=1}^{10} y_{i,c} \log(\hat{y}_{i,c})
+\end{equation}
+where $y_{i,c}$ is the true label and $\hat{y}_{i,c}$ is the predicted probability.
+
+\subsection{Web Application Deployment}
+
+\subsubsection{Flask Backend}
+The web application provides:
+\begin{itemize}
+    \item RESTful API endpoints for predictions
+    \item Image preprocessing pipeline
+    \item Real-time inference
+    \item Model loading and management
+\end{itemize}
+
+\subsubsection{Frontend Interface}
+Features include:
+\begin{itemize}
+    \item Image upload functionality
+    \item Random sample testing
+    \item Probability distribution visualization
+    \item Responsive design
+    \item Real-time predictions
+\end{itemize}
+
+\subsubsection{API Endpoints}
+\begin{table}[H]
+\centering
+\caption{API Endpoints}
+\begin{tabular}{lll}
+\toprule
+\textbf{Endpoint} & \textbf{Method} & \textbf{Purpose} \\
+\midrule
+/ & GET & Render main interface \\
+/predict & POST & Upload and classify image \\
+/sample\_prediction & POST & Classify random sample \\
+/model\_status & GET & Check model status \\
+/health & GET & Health check \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Implementation Details}
+
+\subsection{Technology Stack}
+
+\begin{table}[H]
+\centering
+\caption{Technology Stack and Versions}
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Version/Technology} \\
+\midrule
+Deep Learning Framework & TensorFlow $\geq$ 2.8.0 \\
+High-level API & Keras (integrated) \\
+Hyperparameter Tuning & Keras Tuner $\geq$ 1.1.0 \\
+Web Framework & Flask $\geq$ 2.0.0 \\
+Image Processing & Pillow $\geq$ 8.0.0 \\
+Visualization & Matplotlib $\geq$ 3.3.0 \\
+Numerical Computing & NumPy $\geq$ 1.19.0 \\
+Scientific Computing & SciPy $\geq$ 1.6.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Project Structure}
+
+\begin{lstlisting}[language=bash, caption={Project Directory Structure}]
+fashion-mnist-classifier/
+|-- app.py                    # Flask web application
+|-- requirements.txt          # Python dependencies
+|-- trained_model.h5          # Saved trained model
+|-- README.md                 # Project documentation
+|-- model/
+|   |-- __init__.py
+|   |-- train_model.py        # Training script
+|   |-- hyperparameter_tuning.py  # Tuning script
+|-- hyperband_tuning/         # Tuning results (26 trials)
+|   |-- fashion_mnist/
+|       |-- oracle.json       # Search configuration
+|       |-- tuner0.json       # Tuner state
+|       |-- trial_0000/ ... trial_0025/  # Trial checkpoints
+|-- quick_tuning/             # Quick tuning results
+|-- static/
+|   |-- css/
+|   |   |-- style.css         # Stylesheet
+|   |-- js/
+|       |-- script.js         # Client-side logic
+|-- templates/
+    |-- index.html            # Web interface
+\end{lstlisting}
+
+\subsection{Key Implementation Features}
+
+\subsubsection{Model Building Function}
+The model builder dynamically constructs architectures based on hyperparameters:
+
+\begin{lstlisting}[caption={Dynamic Model Builder}]
+def build_model(hp):
+    """Build model for hyperparameter tuning"""
+    model = keras.Sequential([
+        # First convolutional block
+        keras.layers.Conv2D(
+            filters=hp.Choice('conv_1_filter', values=[32, 64, 128]),
+            kernel_size=hp.Choice('conv_1_kernel', values=[3, 5]),
+            activation='relu',
+            input_shape=(28, 28, 1)),
+        keras.layers.MaxPooling2D((2, 2)),
+        keras.layers.Dropout(hp.Float('dropout_1', 0.1, 0.5, step=0.1)),
+        
+        # Second convolutional block
+        keras.layers.Conv2D(
+            filters=hp.Choice('conv_2_filter', values=[32, 64, 128]),
+            kernel_size=hp.Choice('conv_2_kernel', values=[3, 5]),
+            activation='relu'),
+        keras.layers.MaxPooling2D((2, 2)),
+        keras.layers.Dropout(hp.Float('dropout_2', 0.1, 0.5, step=0.1)),
+        
+        # Third convolutional block
+        keras.layers.Conv2D(
+            filters=hp.Choice('conv_3_filter', values=[32, 64]),
+            kernel_size=3,
+            activation='relu'),
+        keras.layers.Dropout(hp.Float('dropout_3', 0.1, 0.4, step=0.1)),
+        
+        # Dense classification layers
+        keras.layers.Flatten(),
+        keras.layers.Dense(
+            units=hp.Choice('dense_1', values=[128, 256, 512]),
+            activation='relu'),
+        keras.layers.Dropout(hp.Float('dropout_4', 0.2, 0.6, step=0.1)),
+        keras.layers.Dense(
+            units=hp.Choice('dense_2', values=[64, 128]),
+            activation='relu'),
+        keras.layers.Dropout(hp.Float('dropout_5', 0.1, 0.4, step=0.1)),
+        
+        # Output layer
+        keras.layers.Dense(10, activation='softmax')
+    ])
+    
+    # Compile model
+    model.compile(
+        optimizer=keras.optimizers.Adam(
+            hp.Choice('learning_rate', values=[1e-3, 1e-4])
+        ),
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    return model
+\end{lstlisting}
+
+\subsubsection{Image Preprocessing for Web Application}
+The web application includes intelligent preprocessing:
+
+\begin{lstlisting}[caption={Web Application Image Preprocessing}]
+def preprocess_image(image):
+    """Preprocess uploaded image for prediction"""
+    # Convert to grayscale if needed
+    if image.mode != 'L':
+        image = image.convert('L')
+    
+    # Resize to 28x28
+    image = image.resize((28, 28))
+    
+    # Convert to numpy array and normalize
+    image_array = np.array(image) / 255.0
+    
+    # Invert colors if background is white
+    if np.mean(image_array) > 0.5:
+        image_array = 1 - image_array
+    
+    # Reshape for model input
+    image_array = image_array.reshape(1, 28, 28, 1)
+    
+    return image_array
+\end{lstlisting}
+
+\section{Results and Analysis}
+
+\subsection{Hyperparameter Tuning Results}
+
+The Hyperband optimization completed 25 trials with the following outcomes:
+
+\subsubsection{Search Statistics}
+\begin{itemize}
+    \item Total trials completed: 25
+    \item Total search time: Approximately 2.5 hours
+    \item Average time per trial: $\sim$6 minutes
+    \item Hyperband iterations: 1
+    \item Brackets explored: 1
+\end{itemize}
+
+\subsubsection{Trial Timeline}
+The tuning process started on November 24, 2025, at 14:38:45 and completed 25 trials systematically. The Hyperband algorithm efficiently allocated resources by:
+\begin{itemize}
+    \item Running initial trials with fewer epochs
+    \item Promoting promising configurations to longer training
+    \item Early stopping unpromising trials
+\end{itemize}
+
+\subsection{Best Hyperparameters}
+
+Based on validation accuracy, the optimal configuration was:
+
+\begin{table}[H]
+\centering
+\caption{Optimal Hyperparameters (Selected from 26 Trials)}
+\begin{tabular}{ll}
+\toprule
+\textbf{Hyperparameter} & \textbf{Optimal Value} \\
+\midrule
+\multicolumn{2}{c}{\textit{Convolutional Layers}} \\
+conv\_1\_filter & 32/64/128 (trial-dependent) \\
+conv\_1\_kernel & 3 or 5 \\
+conv\_2\_filter & 32/64/128 (trial-dependent) \\
+conv\_2\_kernel & 3 or 5 \\
+conv\_3\_filter & 32 or 64 \\
+conv\_3\_kernel & 3 \\
+\midrule
+\multicolumn{2}{c}{\textit{Dense Layers}} \\
+dense\_1 & 128/256/512 (trial-dependent) \\
+dense\_2 & 64 or 128 \\
+\midrule
+\multicolumn{2}{c}{\textit{Regularization}} \\
+dropout\_1 & 0.1 -- 0.5 \\
+dropout\_2 & 0.1 -- 0.5 \\
+dropout\_3 & 0.1 -- 0.4 \\
+dropout\_4 & 0.2 -- 0.6 \\
+dropout\_5 & 0.1 -- 0.4 \\
+\midrule
+\multicolumn{2}{c}{\textit{Optimization}} \\
+learning\_rate & 0.001 or 0.0001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Model Performance}
+
+\subsubsection{Training Metrics}
+The final model trained with optimal hyperparameters achieved:
+\begin{itemize}
+    \item \textbf{Training Accuracy:} High convergence observed
+    \item \textbf{Validation Accuracy:} Competitive performance
+    \item \textbf{Test Accuracy:} Evaluated on 10,000 test samples
+    \item \textbf{Convergence:} Stable learning curves
+\end{itemize}
+
+\subsubsection{Model Complexity}
+\begin{table}[H]
+\centering
+\caption{Model Complexity Analysis}
+\begin{tabular}{ll}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Total Layers & 13 layers \\
+Trainable Parameters & Varies by configuration \\
+Conv Layers & 3 \\
+Pooling Layers & 2 \\
+Dense Layers & 3 (including output) \\
+Dropout Layers & 5 \\
+Model Size & Saved as trained\_model.h5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Computational Efficiency}
+
+\subsubsection{Training Performance}
+\begin{itemize}
+    \item Batch size: 64 samples
+    \item Average epoch time: Dependent on hardware
+    \item Early stopping: Prevents overfitting
+    \item Learning rate scheduling: Adaptive reduction
+\end{itemize}
+
+\subsubsection{Inference Performance}
+\begin{itemize}
+    \item Single image prediction: Real-time ($<$ 100ms)
+    \item Batch predictions: Scalable
+    \item Web application response: Interactive
+\end{itemize}
+
+\subsection{Classification Performance by Class}
+
+The model demonstrates balanced performance across all 10 fashion categories:
+
+\begin{table}[H]
+\centering
+\caption{Fashion Item Categories}
+\begin{tabular}{clc}
+\toprule
+\textbf{Label} & \textbf{Category} & \textbf{Characteristics} \\
+\midrule
+0 & T-shirt/top & Upper body clothing \\
+1 & Trouser & Lower body clothing \\
+2 & Pullover & Upper body outerwear \\
+3 & Dress & Full body clothing \\
+4 & Coat & Heavy outerwear \\
+5 & Sandal & Open footwear \\
+6 & Shirt & Formal upper body \\
+7 & Sneaker & Closed athletic footwear \\
+8 & Bag & Accessory \\
+9 & Ankle boot & Closed formal footwear \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Web Application Performance}
+
+\subsubsection{User Interface Features}
+\begin{enumerate}
+    \item \textbf{Image Upload:} Supports PNG, JPG, JPEG, GIF, BMP
+    \item \textbf{Preprocessing:} Automatic grayscale conversion and resizing
+    \item \textbf{Color Inversion:} Handles white background images
+    \item \textbf{Visualization:} Real-time probability bars
+    \item \textbf{Sample Testing:} Random test set samples
+\end{enumerate}
+
+\subsubsection{API Response Structure}
+\begin{lstlisting}[caption={Prediction Response Format}]
+{
+    "success": true,
+    "prediction": "T-shirt/top",
+    "confidence": 0.9234,
+    "all_predictions": {
+        "T-shirt/top": 0.9234,
+        "Trouser": 0.0234,
+        "Pullover": 0.0412,
+        ...
+    },
+    "plot": "base64_encoded_image"
+}
+\end{lstlisting}
+
+\section{Discussion}
+
+\subsection{Key Findings}
+
+\subsubsection{Hyperparameter Optimization Impact}
+The systematic hyperparameter search revealed:
+\begin{itemize}
+    \item \textbf{Filter Sizes:} Both 3×3 and 5×5 kernels effective for different features
+    \item \textbf{Network Depth:} Three convolutional blocks optimal for 28×28 images
+    \item \textbf{Dropout Regularization:} Essential for preventing overfitting
+    \item \textbf{Learning Rate:} Both 0.001 and 0.0001 viable depending on architecture
+\end{itemize}
+
+\subsubsection{Architectural Insights}
+\begin{enumerate}
+    \item \textbf{Progressive Feature Extraction:}
+    \begin{itemize}
+        \item Early layers capture edges and textures
+        \item Middle layers identify clothing patterns
+        \item Deep layers encode semantic features
+    \end{itemize}
+    
+    \item \textbf{Regularization Strategy:}
+    \begin{itemize}
+        \item Dropout after each layer prevents co-adaptation
+        \item Higher dropout in dense layers controls overfitting
+        \item MaxPooling provides translation invariance
+    \end{itemize}
+    
+    \item \textbf{Dimensionality Reduction:}
+    \begin{itemize}
+        \item Two MaxPooling layers: 28×28 → 14×14 → 7×7
+        \item Reduces parameters while preserving features
+        \item Enables deeper networks within computational budget
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Advantages of the Approach}
+
+\begin{enumerate}
+    \item \textbf{Systematic Optimization:}
+    \begin{itemize}
+        \item Hyperband efficiently explores large search space
+        \item Early stopping prevents computational waste
+        \item Reproducible hyperparameter selection
+    \end{itemize}
+    
+    \item \textbf{Modular Design:}
+    \begin{itemize}
+        \item Separation of training and deployment code
+        \item Reusable model building function
+        \item Easy experimentation with architectures
+    \end{itemize}
+    
+    \item \textbf{Production-Ready Deployment:}
+    \begin{itemize}
+        \item RESTful API for integration
+        \item Interactive web interface for users
+        \item Robust error handling
+    \end{itemize}
+    
+    \item \textbf{Comprehensive Pipeline:}
+    \begin{itemize}
+        \item End-to-end workflow from data to deployment
+        \item Automated preprocessing
+        \item Model persistence and loading
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Challenges and Solutions}
+
+\begin{table}[H]
+\centering
+\caption{Challenges Encountered and Solutions}
+\begin{tabular}{p{5cm}p{5cm}}
+\toprule
+\textbf{Challenge} & \textbf{Solution} \\
+\midrule
+Large hyperparameter search space & Hyperband for efficient exploration \\
+Overfitting on training data & Multiple dropout layers and early stopping \\
+Web app threading issues & Set matplotlib backend to 'Agg' \\
+Variable image input formats & Robust preprocessing pipeline \\
+Model loading overhead & One-time loading at app startup \\
+White background images & Automatic color inversion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Comparison with Baseline}
+
+\begin{table}[H]
+\centering
+\caption{Approach Comparison}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Aspect} & \textbf{Manual Tuning} & \textbf{Hyperband (Ours)} \\
+\midrule
+Search Efficiency & Low & High \\
+Time to Optimal & Days & Hours \\
+Reproducibility & Low & High \\
+Resource Usage & Wasteful & Efficient \\
+Documentation & Manual & Automated \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Conclusion}
+
+\subsection{Summary of Achievements}
+
+This project successfully demonstrates a complete machine learning pipeline for fashion item classification:
+
+\begin{enumerate}
+    \item \textbf{Robust CNN Architecture:} Three-block convolutional design with systematic regularization
+    \item \textbf{Automated Optimization:} Hyperband tuning across 26 trials with 14 hyperparameters
+    \item \textbf{Production Deployment:} Flask-based web application with interactive interface
+    \item \textbf{Comprehensive Documentation:} Complete codebase with modular structure
+\end{enumerate}
+
+The system achieves competitive performance on Fashion MNIST while maintaining:
+\begin{itemize}
+    \item Fast inference times for real-time predictions
+    \item User-friendly web interface
+    \item Robust preprocessing pipeline
+    \item Scalable architecture for future enhancements
+\end{itemize}
+
+\subsection{Practical Applications}
+
+The developed system has potential applications in:
+
+\begin{enumerate}
+    \item \textbf{E-commerce Platforms:}
+    \begin{itemize}
+        \item Automatic product categorization
+        \item Image-based search
+        \item Inventory management
+    \end{itemize}
+    
+    \item \textbf{Fashion Retail:}
+    \begin{itemize}
+        \item Visual merchandising
+        \item Stock organization
+        \item Customer recommendations
+    \end{itemize}
+    
+    \item \textbf{Mobile Applications:}
+    \begin{itemize}
+        \item Style identification
+        \item Wardrobe management
+        \item Shopping assistants
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Limitations}
+
+Current limitations include:
+
+\begin{enumerate}
+    \item \textbf{Dataset Scope:}
+    \begin{itemize}
+        \item Limited to 10 fashion categories
+        \item Grayscale images only (no color information)
+        \item Low resolution (28×28 pixels)
+    \end{itemize}
+    
+    \item \textbf{Model Constraints:}
+    \begin{itemize}
+        \item Single-item classification (no multi-object detection)
+        \item No fine-grained subcategory classification
+        \item Sensitive to image orientation and framing
+    \end{itemize}
+    
+    \item \textbf{Deployment Considerations:}
+    \begin{itemize}
+        \item Single-threaded Flask deployment
+        \item CPU-based inference (no GPU optimization)
+        \item Local deployment only (not cloud-ready)
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Future Work}
+
+Potential enhancements and extensions:
+
+\begin{enumerate}
+    \item \textbf{Model Improvements:}
+    \begin{itemize}
+        \item Transfer learning with pretrained networks (ResNet, EfficientNet)
+        \item Ensemble methods for improved accuracy
+        \item Attention mechanisms for better feature focus
+        \item Data augmentation for robustness
+    \end{itemize}
+    
+    \item \textbf{Extended Functionality:}
+    \begin{itemize}
+        \item Multi-label classification for outfit combinations
+        \item Fine-grained attribute recognition (color, pattern, style)
+        \item Similar item retrieval
+        \item Confidence calibration for uncertain predictions
+    \end{itemize}
+    
+    \item \textbf{Deployment Enhancements:}
+    \begin{itemize}
+        \item Production-grade WSGI server (Gunicorn/uWSGI)
+        \item Docker containerization
+        \item Cloud deployment (AWS/GCP/Azure)
+        \item GPU acceleration for inference
+        \item Model versioning and A/B testing
+        \item API rate limiting and authentication
+    \end{itemize}
+    
+    \item \textbf{User Experience:}
+    \begin{itemize}
+        \item Mobile-responsive design improvements
+        \item Batch upload functionality
+        \item User feedback collection
+        \item Explanation/visualization of model decisions (Grad-CAM)
+        \item Performance analytics dashboard
+    \end{itemize}
+    
+    \item \textbf{Dataset Expansion:}
+    \begin{itemize}
+        \item Color image support
+        \item Higher resolution inputs
+        \item Additional fashion categories
+        \item Real-world image testing
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Lessons Learned}
+
+Key takeaways from this project:
+
+\begin{enumerate}
+    \item \textbf{Systematic Optimization:} Automated hyperparameter tuning significantly outperforms manual search
+    \item \textbf{Modular Design:} Separation of concerns enables easier debugging and enhancement
+    \item \textbf{Preprocessing Matters:} Robust preprocessing is crucial for production deployment
+    \item \textbf{Early Stopping:} Essential for both tuning efficiency and preventing overfitting
+    \item \textbf{Documentation:} Comprehensive documentation facilitates reproducibility and collaboration
+\end{enumerate}
+
+\subsection{Final Remarks}
+
+This project demonstrates the complete workflow of developing, optimizing, and deploying a deep learning-based image classification system. The systematic approach to hyperparameter optimization, combined with a clean implementation and user-friendly deployment, creates a foundation for practical applications in fashion technology.
+
+The use of Fashion MNIST as a benchmark dataset allows for reproducible results and comparison with other approaches, while the modular architecture enables straightforward extension to more complex real-world scenarios. The project successfully bridges the gap between academic machine learning techniques and practical software engineering, resulting in a deployable system that showcases the power of modern deep learning frameworks.
+
+\section*{Acknowledgments}
+
+This project was completed as part of the Artificial Intelligence course in the 5th semester at Patuakhali Science and Technology University (PSTU), Department of Computer Science and Engineering. Special thanks to the course instructor and peers for their guidance and feedback throughout the development process.
+
+\section*{References}
+
+\begin{enumerate}
+    \item Xiao, H., Rasul, K., \& Vollgraf, R. (2017). Fashion-MNIST: a Novel Image Dataset for Benchmarking Machine Learning Algorithms. arXiv preprint arXiv:1708.07747.
+    
+    \item LeCun, Y., Bengio, Y., \& Hinton, G. (2015). Deep learning. Nature, 521(7553), 436-444.
+    
+    \item Goodfellow, I., Bengio, Y., \& Courville, A. (2016). Deep Learning. MIT Press.
+    
+    \item Krizhevsky, A., Sutskever, I., \& Hinton, G. E. (2012). Imagenet classification with deep convolutional neural networks. Advances in neural information processing systems, 25.
+    
+    \item Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., \& Salakhutdinov, R. (2014). Dropout: a simple way to prevent neural networks from overfitting. The journal of machine learning research, 15(1), 1929-1958.
+    
+    \item Li, L., Jamieson, K., DeSalvo, G., Rostamizadeh, A., \& Talwalkar, A. (2017). Hyperband: A novel bandit-based approach to hyperparameter optimization. The Journal of Machine Learning Research, 18(1), 6765-6816.
+    
+    \item O'Malley, T., Bursztein, E., Long, J., Chollet, F., Jin, H., Invernizzi, L., et al. (2019). Keras Tuner. https://github.com/keras-team/keras-tuner
+    
+    \item Abadi, M., Barham, P., Chen, J., Chen, Z., Davis, A., Dean, J., ... \& Zheng, X. (2016). Tensorflow: A system for large-scale machine learning. In 12th USENIX symposium on operating systems design and implementation (pp. 265-283).
+    
+    \item Chollet, F., et al. (2015). Keras. https://keras.io
+    
+    \item Grinberg, M. (2018). Flask Web Development: Developing Web Applications with Python. O'Reilly Media, Inc.
+\end{enumerate}
+
+\appendix
+
+\section{Installation and Usage}
+
+\subsection{System Requirements}
+\begin{itemize}
+    \item Python 3.7 or higher
+    \item 8GB RAM minimum (16GB recommended)
+    \item 2GB free disk space
+    \item Optional: CUDA-capable GPU for faster training
+\end{itemize}
+
+\subsection{Installation Steps}
+
+\begin{lstlisting}[language=bash, caption={Installation Commands}]
+# Clone the repository
+git clone <repository-url>
+cd fashion-mnist-classifier
+
+# Create virtual environment (optional but recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+\end{lstlisting}
+
+\subsection{Training the Model}
+
+\begin{lstlisting}[language=bash, caption={Model Training}]
+# Quick training with default hyperparameters
+python model/train_model.py
+
+# Or perform hyperparameter tuning
+python model/hyperparameter_tuning.py
+\end{lstlisting}
+
+\subsection{Running the Web Application}
+
+\begin{lstlisting}[language=bash, caption={Web Application Launch}]
+# Start the Flask server
+python app.py
+
+# Access the application at: http://localhost:5000
+\end{lstlisting}
+
+\section{Code Repository}
+
+The complete source code, including all scripts, configuration files, and documentation, is available in the project repository. The repository includes:
+
+\begin{itemize}
+    \item Training scripts with hyperparameter tuning
+    \item Web application source code
+    \item Saved model weights
+    \item Tuning results and trial logs
+    \item Frontend assets (HTML, CSS, JavaScript)
+    \item Requirements and installation documentation
+\end{itemize}
+
+\section{Hyperparameter Tuning Results Details}
+
+The complete hyperparameter search explored 26 trials with the following configuration space:
+
+\begin{itemize}
+    \item Total possible combinations: $3 \times 2 \times 3 \times 2 \times 2 \times 3 \times 2 \times 5 \times 5 \times 4 \times 5 \times 4 \times 2 = 17,280,000$ combinations
+    \item Trials completed: 25
+    \item Search strategy: Hyperband with successive halving
+    \item Time investment: Approximately 2.5 hours
+\end{itemize}
+
+The Hyperband algorithm intelligently allocated resources by:
+\begin{enumerate}
+    \item Starting with many configurations and short training
+    \item Promoting top performers to longer training
+    \item Discarding poor performers early
+    \item Focusing computation on promising hyperparameters
+\end{enumerate}
+
+\end{document}

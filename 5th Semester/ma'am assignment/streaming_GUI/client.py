@@ -157,11 +157,19 @@ class StreamingClientGUI:
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=(0, 15))
         
-        self.connect_btn = ttk.Button(button_frame,
+        self.connect_btn = tk.Button(button_frame,
                                       text="✅ START DOWNLOAD NOW",
                                       command=self.start_download,
-                                      style="Success.TButton",
-                                      width=25)
+                                      font=("Segoe UI", 10, "bold"),
+                                      bg="#27ae60",
+                                      fg="white",
+                                      activebackground="#27ae60",  # Same as bg = no hover effect
+                                      activeforeground="white",
+                                      relief=tk.FLAT,
+                                      cursor="hand2",
+                                      padx=20,
+                                      pady=8,
+                                      borderwidth=0)
         self.connect_btn.pack(side=tk.LEFT, padx=(0, 10))
         
         self.cancel_btn = ttk.Button(button_frame,

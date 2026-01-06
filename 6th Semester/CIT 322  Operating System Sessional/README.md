@@ -23,7 +23,10 @@ mkdir NewFolder
 ```
 rmdir NewFolder
 ```
-
+## Create a file
+```
+notepad file.txt
+```
 ## Remove a file
 
 ```
@@ -89,3 +92,4 @@ tree
 ```
 exit
 ```
+

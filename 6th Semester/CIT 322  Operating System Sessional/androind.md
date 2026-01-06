@@ -26,3 +26,7 @@ clang main.c -o main
 ```
 ./main
 ```
+## For exit 
+```
+exit
+```

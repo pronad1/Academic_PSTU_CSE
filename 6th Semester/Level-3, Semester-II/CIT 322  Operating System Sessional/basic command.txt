@@ -1,0 +1,42 @@
+1.  To show current directory -> pwd
+2.  To show all folder/files -> ls
+3.  To show all folder/files as a list -> ls -lh
+4.  To show hidden folder/file -> ls -a  or ls -lha
+5.  To clear the screen -> clear
+6.  To create a directory -> mkdir os_sessional
+7.  To create a file under this directory -> touch filename.extension
+8.  Copy file from one folder to another folder -> cp source destinatino
+9.  Want to rename a folder/file name -> mv os_sessional os_rename or mv test.txt new.txt
+10. Want to move -> mv source distination
+11. For any help about a command -> 'command' --help
+12. Delete empty  directory from the directory list -> find . -type d -Delete  or rm filename
+13. Download a file from internet -> wget url
+14. Open a image -> display name.jpg
+15. Open a file -> less text.txt
+16. Display the current user -> whoami or echo $USER
+17. View the calender -> cal
+18. For specific month -> cal 2 8 2003
+19. Check details of the file system -> neofethc or fastfetch or lsblk or lscpu
+20. For modify a file -> nano filename or less filename
+21. Fast view -> cat filename
+22. For show details about a file(Lines, Words, Characters) -> wc filename
+23. For run a c file using cl -> nano main.c -> #include<stdio.h> int main() {printf("HI"):} ->  clt + O -> clt + X -> g++ main.c -> ./a.out
+24. To run python file -> python test.py
+25. Show home directory -> echo $HOME
+26. Access manual pages for a command -> command --help or man command (ls --help or man ls)
+27. Change file permissions -> chmod +x filename
+28. Locate a file in a system -> ls -R | grep filename
+29. Check server conncetivity -> ping 9.9.9.9
+30. For specifin times ping like 5 time -> ping -c 5 9.9.9.9
+31. Redirect data/text into a file -> ping -c 5 9.9.9.9 > data.txt
+32. When use sudo -> sudo mean super user that mean has all permissions so when we need permissions to execute a command then we use sudo befor this command like sudo packman -S nearfetch.
+33. Command for zip file ->zip compressed.zip file_1 file_2
+34. Check out usage of specific file -> du -h filename
+35. Change wallpaper -> plasma-apply-wallpaperimage /path/to/wallpaper.jpg
+36. Running a java code -> nano main.java -> public class melloworld { public static void main(String[] args) { System.out.println("Prosenjit"); } } -> javac main.java -> java main
+
+
+
+
+
+

@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Serial Chase Problem — Multi-Window Simulation</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #151b23;
+      --panel2: #1b2330;
+      --line: #2a3441;
+      --text: #e6edf3;
+      --sub: #8b98a9;
+      --accent: #3fb6ff;
+      --accent2: #ff7b54;
+      --good: #3ddc97;
+      --warn: #ffb454;
+      --danger: #ff5d5d;
+      --node-a: #3fb6ff;
+      --node-b: #3ddc97;
+      --node-c: #ffb454;
+      --node-d: #ff5d5d;
+      --node-e: #c792ea;
+      --node-f: #5dd5ff;
+      --node-g: #ff9f43;
+      --node-h: #ff6b9d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 20px 16px 40px;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 4px;
+      letter-spacing: .2px;
+    }
+
+    .subtitle {
+      color: var(--sub);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 18px 0 14px;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      flex: 1;
+      min-width: 150px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: .15s;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .tab:hover {
+      border-color: var(--accent);
+    }
+
+    .tab.active {
+      border-color: var(--accent);
+      background: var(--panel2);
+      box-shadow: 0 0 0 1px var(--accent) inset;
+    }
+
+    .tab .t-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .tab .t-meta {
+      font-size: 11px;
+      color: var(--sub);
+    }
+
+    .stage {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 16px;
+    }
+
+    @media (max-width:780px) {
+      .stage {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .canvas-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      background: #0a0f15;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      display: block;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: .12s;
+      font-weight: 500;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #06121a;
+      border-color: var(--accent);
+    }
+
+    button.primary:hover {
+      opacity: .88;
+      color: #06121a;
+    }
+
+    button.warn {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    button.warn:hover {
+      background: rgba(255, 93, 93, .12);
+    }
+
+    button:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .speed-label {
+      font-size: 12px;
+      color: var(--sub);
+      margin-left: 4px;
+    }
+
+    input[type=range] {
+      width: 110px;
+      vertical-align: middle;
+    }
+
+    .timebar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--sub);
+    }
+
+    .timebar .track {
+      flex: 1;
+      height: 6px;
+      background: var(--panel2);
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+
+    .timebar .fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--good));
+      width: 0%;
+    }
+
+    .timebar .tval {
+      min-width: 96px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+
+    .card h3 {
+      font-size: 12px;
+      margin: 0 0 8px;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card h3 .tag {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 5px;
+      background: var(--panel);
+      color: var(--sub);
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 500;
+    }
+
+    .card h3 .tag.done {
+      background: rgba(61, 220, 151, .14);
+      color: var(--good);
+    }
+
+    .card h3 .tag.running {
+      background: rgba(63, 182, 255, .14);
+      color: var(--accent);
+    }
+
+    .big-stat {
+      font-size: 30px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    .big-sub {
+      font-size: 11px;
+      color: var(--sub);
+      margin-top: 2px;
+    }
+
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .legend .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex: none;
+    }
+
+    .legend .row.dead {
+      opacity: .4;
+    }
+
+    .legend .row .lbl {
+      flex: 1;
+    }
+
+    .legend .row .lbl small {
+      color: var(--sub);
+      margin-left: 4px;
+    }
+
+    .events {
+      max-height: 140px;
+      overflow-y: auto;
+      font-size: 11.5px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .events .ev {
+      padding: 5px 8px;
+      background: var(--panel);
+      border-radius: 6px;
+      border-left: 2px solid var(--danger);
+    }
+
+    .events .ev .et {
+      color: var(--sub);
+      float: right;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .summary-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .summary-card .sc-title {
+      font-size: 12px;
+      color: var(--sub);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .summary-card .sc-num {
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .summary-card .sc-sub {
+      font-size: 11px;
+      color: var(--sub);
+      margin-top: 3px;
+    }
+
+    @media (max-width:780px) {
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .footnote {
+      font-size: 11px;
+      color: var(--sub);
+      margin-top: 16px;
+      line-height: 1.6;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+
+    .settings-toggle {
+      display: flex;
+      justify-content: flex-end;
+      margin: -4px 0 10px;
+    }
+
+    .settings-toggle button {
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+
+    .settings-panel {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    .settings-panel.open {
+      display: block;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px 16px;
+      margin-bottom: 14px;
+    }
+
+    @media (max-width:780px) {
+      .settings-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field label {
+      font-size: 11px;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      font-weight: 600;
+    }
+
+    .field input {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 7px;
+      padding: 7px 9px;
+      font-size: 13px;
+      width: 100%;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .field input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .field .hint {
+      font-size: 10px;
+      color: var(--sub);
+      opacity: .8;
+    }
+
+    .node-speed-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px 14px;
+      margin-bottom: 14px;
+    }
+
+    .node-speed-grid .field label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .node-speed-grid .field label .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex: none;
+    }
+
+    .settings-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+
+    .settings-note {
+      font-size: 11.5px;
+      color: var(--sub);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .settings-section-title {
+      font-size: 11px;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      font-weight: 600;
+      margin: 0 0 10px;
+    }
+
+    .err-msg {
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 8px;
+      display: none;
+    }
+
+    .err-msg.show {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Serial chase problem — multi-window pursuit simulation</h1>
+      <p class="subtitle">Extends D. S. Hira's Section 3.6 serial-chase model (A → B → C → D, each chasing the next)
+        into three independently sized windows with more nodes, zigzag evasion for the lead node, and collision counting
+        per run. Every value below starts at a sensible default — edit any of them and re-run.</p>
+    </header>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="settings-toggle">
+      <button id="btnToggleSettings">Edit window settings</button>
+    </div>
+
+    <div class="settings-panel" id="settingsPanel">
+      <p class="settings-note">These values are pre-filled with this window's defaults. Change any field, then press <b
+          style="color:var(--text)">Apply &amp; re-run</b> to simulate again with your new numbers, or <b
+          style="color:var(--text)">Reset to defaults</b> to go back to the original setup.</p>
+
+      <p class="settings-section-title">Window &amp; timing</p>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="inSize">Window size (units)</label>
+          <input type="number" id="inSize" min="1" max="200" step="0.5">
+          <span class="hint">Field is size × size</span>
+        </div>
+        <div class="field">
+          <label for="inNodes">Number of nodes</label>
+          <input type="number" id="inNodes" min="2" max="8" step="1">
+          <span class="hint">2 to 8 nodes (A..H)</span>
+        </div>
+        <div class="field">
+          <label for="inMinutes">Total run time (min)</label>
+          <input type="number" id="inMinutes" min="0.5" max="200" step="0.5">
+          <span class="hint">Simulation always runs this full length</span>
+        </div>
+        <div class="field">
+          <label for="inDt">Step size, &Delta;t (min)</label>
+          <input type="number" id="inDt" min="0.001" max="2" step="0.001">
+          <span class="hint">Fixed for the whole run</span>
+        </div>
+        <div class="field">
+          <label for="inHit">Hit radius (units)</label>
+          <input type="number" id="inHit" min="0.001" max="20" step="0.01">
+          <span class="hint">Distance counted as a collision</span>
+        </div>
+        <div class="field">
+          <label for="inSeed">Zigzag seed</label>
+          <input type="number" id="inSeed" min="0" max="999999" step="1">
+          <span class="hint">Changes the evader's zigzag pattern</span>
+        </div>
+      </div>
+
+      <p class="settings-section-title">Per-node speed (units / min)</p>
+      <div class="node-speed-grid" id="speedInputs"></div>
+
+      <div class="err-msg" id="settingsErr"></div>
+
+      <div class="settings-actions">
+        <button class="primary" id="btnApply">Apply &amp; re-run</button>
+        <button id="btnDefaults">Reset to defaults</button>
+        <button id="btnCloseSettings">Close</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="canvas-col">
+        <canvas id="cv" width="900" height="900"></canvas>
+        <div class="timebar">
+          <span>t =</span>
+          <div class="track">
+            <div class="fill" id="timefill"></div>
+          </div>
+          <span class="tval" id="timeval">0.00 / 0.00 min</span>
+        </div>
+        <div class="controls">
+          <button class="primary" id="btnPlay">Play</button>
+          <button id="btnStep">Step</button>
+          <button id="btnFinish">Run to end</button>
+          <button id="btnReset">Reset</button>
+          <span class="speed-label">Speed</span>
+          <input type="range" id="speed" min="1" max="12" value="4" step="1">
+        </div>
+      </div>
+      <div class="side">
+        <div class="card">
+          <h3>Collisions this window <span class="tag" id="statusTag">running</span></h3>
+          <div class="big-stat" id="collCount">0</div>
+          <div class="big-sub" id="collSub">of 0 possible chase links</div>
+        </div>
+        <div class="card">
+          <h3>Node legend</h3>
+          <div class="legend" id="legend"></div>
+        </div>
+        <div class="card">
+          <h3>Window parameters</h3>
+          <div class="params" id="paramsBox" style="font-size:11.5px; color:var(--sub); line-height:1.6;"></div>
+        </div>
+        <div class="card">
+          <h3>Collision log</h3>
+          <div class="events" id="events">
+            <div style="color:var(--sub)">No collisions yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <div class="footnote">
+      Model: node <code>i</code> always steers directly toward the current position of node <code>i+1</code> at its own
+      fixed speed (pure pursuit, as in the book's A→B→C→D chase). The final node in each chain has no target and instead
+      sweeps a zigzag heading. All nodes reflect off the window's edges so nobody leaves the field. <b
+        style="color:var(--text)">A collision only deactivates that one chase link — it never stops the simulation.</b>
+      Every other active link keeps moving and can still collide later, and the run always continues until the window's
+      full time has elapsed. The total collision count shown is the count after the complete run, not a running partial
+      count that might still change. Step size (&Delta;t) is fixed within a window for the duration of its run.
+    </div>
+  </div>
+
+  <script>
+    const NODE_COLORS = ['--node-a', '--node-b', '--node-c', '--node-d', '--node-e', '--node-f', '--node-g', '--node-h'];
+    const NODE_NAMES_8 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
+    function cssVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function buildWindowConfig(opts) {
+      const { size, nNodes, totalMinutes, dt, velocities, hitRadius, seed } = opts;
+      return {
+        size, nNodes, totalMinutes, dt, velocities: velocities.slice(), hitRadius, seed,
+        steps: Math.round(totalMinutes / dt)
+      };
+    }
+
+    const DEFAULT_WINDOWS = [
+      buildWindowConfig({
+        size: 5, nNodes: 4, totalMinutes: 4, dt: 0.01,
+        velocities: [1.8, 1.6, 1.4, 2.0],
+        hitRadius: 0.15, seed: 11,
+      }),
+      buildWindowConfig({
+        size: 9, nNodes: 5, totalMinutes: 9, dt: 0.015,
+        velocities: [1.5, 1.3, 1.15, 1.0, 1.7],
+        hitRadius: 0.18, seed: 22,
+      }),
+      buildWindowConfig({
+        size: 16, nNodes: 8, totalMinutes: 13, dt: 0.02,
+        velocities: [2.2, 2.0, 1.85, 1.7, 1.55, 1.4, 1.25, 2.5],
+        hitRadius: 0.28, seed: 33,
+      }),
+    ];
+
+    // WINDOWS holds the *live* (possibly user-edited) configuration.
+    // DEFAULT_WINDOWS is never mutated, so "reset to defaults" always works.
+    let WINDOWS = DEFAULT_WINDOWS.map(cfg => buildWindowConfig(cfg));
+
+    const WINDOW_LABELS = ['5 × 5 window', '9 × 9 window', '16 × 16 window'];
+    function windowMeta(cfg) {
+      return `${cfg.nNodes} nodes · ${cfg.totalMinutes} min run`;
+    }
+
+    function mulberry32(seed) {
+      return function () {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    // ---------------------------------------------------------------------------
+    // Core simulation: runs the FULL number of steps regardless of collisions.
+    // A collision only deactivates its own chase link; it never stops the loop,
+    // never stops other links, and the total collision count is only meaningful
+    // once the loop has completed every step up to cfg.steps (i.e. the window's
+    // full total_minutes has elapsed).
+    // ---------------------------------------------------------------------------
+    function runSimulation(cfg) {
+      const rand = mulberry32(cfg.seed);
+      const n = cfg.nNodes;
+      const size = cfg.size;
+      const margin = size * 0.12;
+      const span = size - 2 * margin;
+      const cx = size / 2, cy = size / 2;
+      const r = span / 2.15;
+
+      let pos = [];
+      for (let i = 0; i < n; i++) {
+        const angle = (2 * Math.PI * i / n) - Math.PI / 2;
+        pos.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+      }
+
+      const last = n - 1;
+      const zigPeriod = Math.max(0.6, size / 11);
+      const zigAngleBase = rand() * 2 * Math.PI;
+      const zigTurnRate = 0.55 + rand() * 0.25;
+
+      const active = new Array(n - 1).fill(true);
+      const frames = [];
+      const collisionEvents = [];
+      let t = 0;
+      let collisions = 0;
+
+      frames.push({ t, pos: pos.map(p => p.slice()), active: active.slice(), collisions });
+
+      for (let s = 0; s < cfg.steps; s++) {
+        const newPos = pos.map(p => p.slice());
+
+        const baseHeading = zigAngleBase + t * zigTurnRate;
+        const sway = Math.sin(t * (2 * Math.PI / zigPeriod)) * 1.15;
+        const heading = baseHeading + sway;
+        const vLast = cfg.velocities[last];
+        newPos[last][0] += Math.cos(heading) * vLast * cfg.dt;
+        newPos[last][1] += Math.sin(heading) * vLast * cfg.dt;
+
+        for (let i = n - 2; i >= 0; i--) {
+          if (!active[i]) continue;
+          const tx = pos[i + 1][0], ty = pos[i + 1][1];
+          const dx = tx - pos[i][0], dy = ty - pos[i][1];
+          const dist = Math.hypot(dx, dy);
+          if (dist < 1e-9) continue;
+          const ux = dx / dist, uy = dy / dist;
+          const v = cfg.velocities[i];
+          newPos[i][0] += ux * v * cfg.dt;
+          newPos[i][1] += uy * v * cfg.dt;
+        }
+
+        for (let i = 0; i < n; i++) {
+          for (const k of [0, 1]) {
+            if (newPos[i][k] < 0) newPos[i][k] = -newPos[i][k];
+            else if (newPos[i][k] > size) newPos[i][k] = 2 * size - newPos[i][k];
+          }
+        }
+
+        pos = newPos;
+        t += cfg.dt;
+
+        // Collision check never breaks the loop. Each link can only collide
+        // once (it is skipped via `active[i]` afterwards), but every other
+        // link, and the loop itself, keeps going regardless.
+        for (let i = 0; i < n - 1; i++) {
+          if (active[i]) {
+            const d = Math.hypot(pos[i][0] - pos[i + 1][0], pos[i][1] - pos[i + 1][1]);
+            if (d <= cfg.hitRadius) {
+              active[i] = false;
+              collisions++;
+              collisionEvents.push({ t, chaserIdx: i, targetIdx: i + 1 });
+            }
+          }
+        }
+
+        frames.push({ t, pos: pos.map(p => p.slice()), active: active.slice(), collisions });
+      }
+
+      return { frames, collisionEvents, totalCollisions: collisions, possibleLinks: n - 1 };
+    }
+
+    let results = WINDOWS.map(runSimulation);
+
+    let currentWindow = 0;
+    let frameIdx = 0;
+    let playing = false;
+    let speedMult = 4;
+    let rafId = null;
+    let lastTick = 0;
+    let settingsOpen = false;
+
+    const cv = document.getElementById('cv');
+    const ctx = cv.getContext('2d');
+    const tabsEl = document.getElementById('tabs');
+    const legendEl = document.getElementById('legend');
+    const paramsBox = document.getElementById('paramsBox');
+    const eventsEl = document.getElementById('events');
+    const collCountEl = document.getElementById('collCount');
+    const collSubEl = document.getElementById('collSub');
+    const statusTagEl = document.getElementById('statusTag');
+    const timefillEl = document.getElementById('timefill');
+    const timevalEl = document.getElementById('timeval');
+    const btnPlay = document.getElementById('btnPlay');
+    const btnStep = document.getElementById('btnStep');
+    const btnFinish = document.getElementById('btnFinish');
+    const btnReset = document.getElementById('btnReset');
+    const speedInput = document.getElementById('speed');
+
+    const settingsPanel = document.getElementById('settingsPanel');
+    const btnToggleSettings = document.getElementById('btnToggleSettings');
+    const btnCloseSettings = document.getElementById('btnCloseSettings');
+    const btnApply = document.getElementById('btnApply');
+    const btnDefaults = document.getElementById('btnDefaults');
+    const settingsErr = document.getElementById('settingsErr');
+    const inSize = document.getElementById('inSize');
+    const inNodes = document.getElementById('inNodes');
+    const inMinutes = document.getElementById('inMinutes');
+    const inDt = document.getElementById('inDt');
+    const inHit = document.getElementById('inHit');
+    const inSeed = document.getElementById('inSeed');
+    const speedInputsEl = document.getElementById('speedInputs');
+
+    function nodeColorHex(i) {
+      return cssVar(NODE_COLORS[i % NODE_COLORS.length]) || '#888';
+    }
+
+    function buildTabs() {
+      tabsEl.innerHTML = '';
+      WINDOWS.forEach((cfg, idx) => {
+        const div = document.createElement('div');
+        div.className = 'tab' + (idx === currentWindow ? ' active' : '');
+        div.innerHTML = `<span class="t-name">${WINDOW_LABELS[idx]}</span><span class="t-meta">${windowMeta(cfg)}</span>`;
+        div.onclick = () => { selectWindow(idx); };
+        tabsEl.appendChild(div);
+      });
+    }
+
+    function buildLegend(cfg) {
+      legendEl.innerHTML = '';
+      for (let i = 0; i < cfg.nNodes; i++) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.id = 'leg-' + i;
+        const isLast = i === cfg.nNodes - 1;
+        const role = isLast ? 'zigzag (evader)' : `chases ${NODE_NAMES_8[i + 1]}`;
+        row.innerHTML = `<span class="dot" style="background:${nodeColorHex(i)}"></span>
+      <span class="lbl">${NODE_NAMES_8[i]} <small>${role} · v=${cfg.velocities[i]}</small></span>`;
+        legendEl.appendChild(row);
+      }
+    }
+
+    function buildParams(cfg) {
+      paramsBox.innerHTML = `
+    <div><b style="color:var(--text)">Window:</b> ${cfg.size} × ${cfg.size} units</div>
+    <div><b style="color:var(--text)">Nodes:</b> ${cfg.nNodes}</div>
+    <div><b style="color:var(--text)">Chain:</b> ${NODE_NAMES_8.slice(0, cfg.nNodes).join(' → ')}, last node zigzags</div>
+    <div><b style="color:var(--text)">Run time:</b> ${cfg.totalMinutes} min</div>
+    <div><b style="color:var(--text)">Step size (&Delta;t):</b> ${cfg.dt} min (fixed)</div>
+    <div><b style="color:var(--text)">Hit radius:</b> ${cfg.hitRadius} units</div>
+    <div><b style="color:var(--text)">Speeds:</b> ${cfg.velocities.join(', ')} units/min</div>
+  `;
+    }
+
+    function buildSpeedInputs(cfg) {
+      speedInputsEl.innerHTML = '';
+      for (let i = 0; i < cfg.nNodes; i++) {
+        const isLast = i === cfg.nNodes - 1;
+        const field = document.createElement('div');
+        field.className = 'field';
+        field.innerHTML = `
+      <label><span class="dot" style="background:${nodeColorHex(i)}"></span>${NODE_NAMES_8[i]}${isLast ? ' (zigzag)' : ''}</label>
+      <input type="number" min="0.01" max="50" step="0.05" id="speedIn${i}" value="${cfg.velocities[i]}">
+    `;
+        speedInputsEl.appendChild(field);
+      }
+    }
+
+    function fillSettingsForm(cfg) {
+      inSize.value = cfg.size;
+      inNodes.value = cfg.nNodes;
+      inMinutes.value = cfg.totalMinutes;
+      inDt.value = cfg.dt;
+      inHit.value = cfg.hitRadius;
+      inSeed.value = cfg.seed;
+      buildSpeedInputs(cfg);
+      settingsErr.classList.remove('show');
+      settingsErr.textContent = '';
+    }
+
+    // Rebuild the speed-input row whenever the node-count field changes, so the
+    // form always has exactly the right number of editable speeds, pre-filled
+    // with that node's default or its last entered value.
+    inNodes.addEventListener('input', () => {
+      let n = parseInt(inNodes.value, 10);
+      if (isNaN(n)) return;
+      n = Math.max(2, Math.min(8, n));
+      const current = WINDOWS[currentWindow];
+      const existingSpeeds = [];
+      for (let i = 0; i < current.nNodes; i++) {
+        const el = document.getElementById('speedIn' + i);
+        existingSpeeds.push(el ? parseFloat(el.value) : current.velocities[i]);
+      }
+      const fallbackDefaults = DEFAULT_WINDOWS[currentWindow].velocities;
+      const newVelocities = [];
+      for (let i = 0; i < n; i++) {
+        if (i < existingSpeeds.length && !isNaN(existingSpeeds[i])) {
+          newVelocities.push(existingSpeeds[i]);
+        } else {
+          newVelocities.push(fallbackDefaults[i] !== undefined ? fallbackDefaults[i] : 1.0);
+        }
+      }
+      buildSpeedInputs({ nNodes: n, velocities: newVelocities });
+    });
+
+    function readSettingsForm() {
+      const size = parseFloat(inSize.value);
+      const nNodes = parseInt(inNodes.value, 10);
+      const totalMinutes = parseFloat(inMinutes.value);
+      const dt = parseFloat(inDt.value);
+      const hitRadius = parseFloat(inHit.value);
+      const seed = parseInt(inSeed.value, 10) || 0;
+
+      const errors = [];
+      if (isNaN(size) || size <= 0) errors.push('Window size must be a positive number.');
+      if (isNaN(nNodes) || nNodes < 2 || nNodes > 8) errors.push('Number of nodes must be between 2 and 8.');
+      if (isNaN(totalMinutes) || totalMinutes <= 0) errors.push('Total run time must be a positive number.');
+      if (isNaN(dt) || dt <= 0) errors.push('Step size must be a positive number.');
+      if (!isNaN(dt) && !isNaN(totalMinutes) && dt > totalMinutes) errors.push('Step size cannot be larger than the total run time.');
+      if (isNaN(hitRadius) || hitRadius <= 0) errors.push('Hit radius must be a positive number.');
+      if (!isNaN(size) && !isNaN(hitRadius) && hitRadius > size) errors.push('Hit radius should be smaller than the window size.');
+
+      const velocities = [];
+      if (!isNaN(nNodes)) {
+        for (let i = 0; i < nNodes; i++) {
+          const el = document.getElementById('speedIn' + i);
+          const v = el ? parseFloat(el.value) : NaN;
+          if (isNaN(v) || v <= 0) errors.push(`Speed for node ${NODE_NAMES_8[i]} must be a positive number.`);
+          velocities.push(v);
+        }
+      }
+
+      if (!isNaN(totalMinutes) && !isNaN(dt) && dt > 0) {
+        const steps = totalMinutes / dt;
+        if (steps > 200000) errors.push('That many steps would be too slow to render. Increase step size or reduce run time.');
+      }
+
+      return { size, nNodes, totalMinutes, dt, hitRadius, seed, velocities, errors };
+    }
+
+    btnApply.onclick = () => {
+      const parsed = readSettingsForm();
+      if (parsed.errors.length) {
+        settingsErr.textContent = parsed.errors.join(' ');
+        settingsErr.classList.add('show');
+        return;
+      }
+      settingsErr.classList.remove('show');
+
+      const newCfg = buildWindowConfig({
+        size: parsed.size,
+        nNodes: parsed.nNodes,
+        totalMinutes: parsed.totalMinutes,
+        dt: parsed.dt,
+        velocities: parsed.velocities,
+        hitRadius: parsed.hitRadius,
+        seed: parsed.seed,
+      });
+
+      WINDOWS[currentWindow] = newCfg;
+      results[currentWindow] = runSimulation(newCfg);
+      frameIdx = 0;
+      playing = false;
+      btnPlay.textContent = 'Play';
+      buildTabs();
+      buildLegend(newCfg);
+      buildParams(newCfg);
+      eventsEl.innerHTML = '<div style="color:var(--sub)">No collisions yet.</div>';
+      buildSummary();
+      draw();
+    };
+
+    btnDefaults.onclick = () => {
+      const defaultCfg = buildWindowConfig(DEFAULT_WINDOWS[currentWindow]);
+      WINDOWS[currentWindow] = defaultCfg;
+      results[currentWindow] = runSimulation(defaultCfg);
+      frameIdx = 0;
+      playing = false;
+      btnPlay.textContent = 'Play';
+      buildTabs();
+      buildLegend(defaultCfg);
+      buildParams(defaultCfg);
+      fillSettingsForm(defaultCfg);
+      eventsEl.innerHTML = '<div style="color:var(--sub)">No collisions yet.</div>';
+      buildSummary();
+      draw();
+    };
+
+    btnToggleSettings.onclick = () => {
+      settingsOpen = !settingsOpen;
+      settingsPanel.classList.toggle('open', settingsOpen);
+      btnToggleSettings.textContent = settingsOpen ? 'Hide window settings' : 'Edit window settings';
+      if (settingsOpen) fillSettingsForm(WINDOWS[currentWindow]);
+    };
+
+    btnCloseSettings.onclick = () => {
+      settingsOpen = false;
+      settingsPanel.classList.remove('open');
+      btnToggleSettings.textContent = 'Edit window settings';
+    };
+
+    function selectWindow(idx) {
+      currentWindow = idx;
+      frameIdx = 0;
+      playing = false;
+      btnPlay.textContent = 'Play';
+      buildTabs();
+      buildLegend(WINDOWS[idx]);
+      buildParams(WINDOWS[idx]);
+      eventsEl.innerHTML = '<div style="color:var(--sub)">No collisions yet.</div>';
+      if (settingsOpen) fillSettingsForm(WINDOWS[idx]);
+      draw();
+    }
+
+    function draw() {
+      const cfg = WINDOWS[currentWindow];
+      const res = results[currentWindow];
+      const frame = res.frames[frameIdx];
+      const size = cfg.size;
+      const W = cv.width, H = cv.height;
+      const pad = 36;
+      const scale = (W - 2 * pad) / size;
+
+      function toPx(x, y) {
+        return [pad + x * scale, H - pad - y * scale];
+      }
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0a0f15';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.strokeStyle = '#1c2530';
+      ctx.lineWidth = 1;
+      const gridStep = size <= 5 ? 1 : (size <= 10 ? 1 : Math.ceil(size / 12));
+      for (let g = 0; g <= size; g += gridStep) {
+        const [x0, y0] = toPx(g, 0);
+        const [x1, y1] = toPx(g, size);
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        const [x2, y2] = toPx(0, g);
+        const [x3, y3] = toPx(size, g);
+        ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x3, y3); ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#3a4555';
+      ctx.lineWidth = 2;
+      const [bx0, by0] = toPx(0, 0);
+      const [bx1, by1] = toPx(size, size);
+      ctx.strokeRect(bx0, by1, bx1 - bx0, by0 - by1);
+
+      const trailEvery = Math.max(1, Math.round(frameIdx / 260));
+      for (let i = 0; i < cfg.nNodes; i++) {
+        ctx.strokeStyle = nodeColorHex(i);
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        let started = false;
+        for (let f = 0; f <= frameIdx; f += trailEvery) {
+          const p = res.frames[f].pos[i];
+          const [px, py] = toPx(p[0], p[1]);
+          if (!started) { ctx.moveTo(px, py); started = true; } else { ctx.lineTo(px, py); }
+        }
+        const pEnd = frame.pos[i];
+        const [pxE, pyE] = toPx(pEnd[0], pEnd[1]);
+        ctx.lineTo(pxE, pyE);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      for (let i = 0; i < cfg.nNodes - 1; i++) {
+        if (frame.active[i]) {
+          const p1 = frame.pos[i], p2 = frame.pos[i + 1];
+          const [x0, y0] = toPx(p1[0], p1[1]);
+          const [x1, y1] = toPx(p2[0], p2[1]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+
+      for (let i = 0; i < cfg.nNodes; i++) {
+        const p = frame.pos[i];
+        const [px, py] = toPx(p[0], p[1]);
+        const isLast = i === cfg.nNodes - 1;
+        const isDeadChaser = i < cfg.nNodes - 1 && !frame.active[i];
+
+        ctx.beginPath();
+        ctx.arc(px, py, isLast ? 8 : 7, 0, Math.PI * 2);
+        ctx.fillStyle = nodeColorHex(i);
+        ctx.globalAlpha = isDeadChaser ? 0.45 : 1;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#0a0f15';
+        ctx.stroke();
+
+        ctx.font = '600 13px -apple-system,Segoe UI,Roboto,sans-serif';
+        ctx.fillStyle = '#e6edf3';
+        ctx.textAlign = 'center';
+        ctx.fillText(NODE_NAMES_8[i], px, py - 14);
+      }
+
+      const atEnd = frameIdx >= res.frames.length - 1;
+      collCountEl.textContent = atEnd ? res.totalCollisions : frame.collisions;
+      collSubEl.textContent = `of ${res.possibleLinks} possible chase link${res.possibleLinks === 1 ? '' : 's'}` +
+        (atEnd ? ' — final total for this window' : ' (so far; run continues to the end)');
+      statusTagEl.textContent = atEnd ? 'finished' : 'running';
+      statusTagEl.className = 'tag ' + (atEnd ? 'done' : 'running');
+
+      const pct = (frame.t / cfg.totalMinutes) * 100;
+      timefillEl.style.width = Math.min(100, pct).toFixed(1) + '%';
+      timevalEl.textContent = `${frame.t.toFixed(2)} / ${cfg.totalMinutes.toFixed(2)} min`;
+
+      for (let i = 0; i < cfg.nNodes - 1; i++) {
+        const row = document.getElementById('leg-' + i);
+        if (row) row.classList.toggle('dead', !frame.active[i]);
+      }
+
+      renderEventsUpTo(frameIdx);
+    }
+
+    function renderEventsUpTo(idx) {
+      const res = results[currentWindow];
+      const t = results[currentWindow].frames[idx].t;
+      const visible = res.collisionEvents.filter(e => e.t <= t);
+      if (visible.length === 0) {
+        eventsEl.innerHTML = '<div style="color:var(--sub)">No collisions yet.</div>';
+        return;
+      }
+      eventsEl.innerHTML = visible.map(e => {
+        const chaser = NODE_NAMES_8[e.chaserIdx];
+        const target = NODE_NAMES_8[e.targetIdx];
+        return `<div class="ev"><span class="et">t=${e.t.toFixed(2)}</span>${chaser} caught ${target}</div>`;
+      }).reverse().join('');
+    }
+
+    function stepOnce() {
+      const res = results[currentWindow];
+      if (frameIdx < res.frames.length - 1) {
+        frameIdx++;
+        draw();
+        return true;
+      } else {
+        playing = false;
+        btnPlay.textContent = 'Play';
+        return false;
+      }
+    }
+
+    function loop(ts) {
+      if (!playing) return;
+      if (!lastTick) lastTick = ts;
+      const elapsed = ts - lastTick;
+      const stepsPerFrame = speedMult;
+      const interval = 16;
+      if (elapsed >= interval) {
+        lastTick = ts;
+        let moved = false;
+        for (let k = 0; k < stepsPerFrame; k++) {
+          moved = stepOnce();
+          if (!moved) break;
+        }
+      }
+      if (playing) rafId = requestAnimationFrame(loop);
+    }
+
+    btnPlay.onclick = () => {
+      playing = !playing;
+      btnPlay.textContent = playing ? 'Pause' : 'Play';
+      if (playing) {
+        lastTick = 0;
+        rafId = requestAnimationFrame(loop);
+      }
+    };
+
+    btnStep.onclick = () => {
+      playing = false;
+      btnPlay.textContent = 'Play';
+      stepOnce();
+    };
+
+    btnFinish.onclick = () => {
+      playing = false;
+      btnPlay.textContent = 'Play';
+      const res = results[currentWindow];
+      frameIdx = res.frames.length - 1;
+      draw();
+    };
+
+    btnReset.onclick = () => {
+      playing = false;
+      btnPlay.textContent = 'Play';
+      frameIdx = 0;
+      draw();
+    };
+
+    speedInput.oninput = (e) => { speedMult = parseInt(e.target.value, 10); };
+
+    function buildSummary() {
+      const grid = document.getElementById('summaryGrid');
+      grid.innerHTML = '';
+      results.forEach((res, idx) => {
+        const cfg = WINDOWS[idx];
+        const div = document.createElement('div');
+        div.className = 'summary-card';
+        div.innerHTML = `
+      <div class="sc-title">${WINDOW_LABELS[idx]}</div>
+      <div class="sc-num">${res.totalCollisions}</div>
+      <div class="sc-sub">collisions of ${res.possibleLinks} links · ${cfg.nNodes} nodes · ${cfg.totalMinutes} min · &Delta;t=${cfg.dt}</div>
+    `;
+        grid.appendChild(div);
+      });
+      const total = results.reduce((s, r) => s + r.totalCollisions, 0);
+      const totalMinutes = WINDOWS.reduce((s, c) => s + c.totalMinutes, 0);
+      const div = document.createElement('div');
+      div.className = 'summary-card';
+      div.style.borderColor = 'var(--accent)';
+      div.innerHTML = `
+    <div class="sc-title">Total across all windows</div>
+    <div class="sc-num">${total}</div>
+    <div class="sc-sub">combined collisions over 3 windows, ${totalMinutes.toFixed(1)} minutes simulated total</div>
+  `;
+      grid.appendChild(div);
+    }
+
+    buildSummary();
+    selectWindow(0);
+  </script>
+</body>
+
+</html>

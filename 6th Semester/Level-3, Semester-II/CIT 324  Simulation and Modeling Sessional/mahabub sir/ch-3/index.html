@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Serial Chase Problem — Multi-Window Simulation</title>
+  <title>Serial Chase — Multi‑Window Simulation</title>
   <style>
     :root {
       --bg: #0d1117;
@@ -302,10 +302,6 @@
       flex: none;
     }
 
-    .legend .row.dead {
-      opacity: .4;
-    }
-
     .legend .row .lbl {
       flex: 1;
     }
@@ -516,10 +512,10 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>Serial chase problem — multi-window pursuit simulation</h1>
-      <p class="subtitle">Extends D. S. Hira's Section 3.6 serial-chase model (A → B → C → D, each chasing the next)
+      <h1>Serial chase problem — multi‑window pursuit simulation</h1>
+      <p class="subtitle">Extends D. S. Hira's Section 3.6 serial‑chase model (A → B → C → D, each chasing the next)
         into three independently sized windows with more nodes, zigzag evasion for the lead node, and collision counting
-        per run. Every value below starts at a sensible default — edit any of them and re-run.</p>
+        per run. Every value below starts at a sensible default — edit any of them and re‑run.</p>
     </header>
 
     <div class="tabs" id="tabs"></div>
@@ -529,8 +525,8 @@
     </div>
 
     <div class="settings-panel" id="settingsPanel">
-      <p class="settings-note">These values are pre-filled with this window's defaults. Change any field, then press <b
-          style="color:var(--text)">Apply &amp; re-run</b> to simulate again with your new numbers, or <b
+      <p class="settings-note">These values are pre‑filled with this window's defaults. Change any field, then press <b
+          style="color:var(--text)">Apply &amp; re‑run</b> to simulate again with your new numbers, or <b
           style="color:var(--text)">Reset to defaults</b> to go back to the original setup.</p>
 
       <p class="settings-section-title">Window &amp; timing</p>
@@ -567,13 +563,13 @@
         </div>
       </div>
 
-      <p class="settings-section-title">Per-node speed (units / min)</p>
+      <p class="settings-section-title">Per‑node speed (units / min)</p>
       <div class="node-speed-grid" id="speedInputs"></div>
 
       <div class="err-msg" id="settingsErr"></div>
 
       <div class="settings-actions">
-        <button class="primary" id="btnApply">Apply &amp; re-run</button>
+        <button class="primary" id="btnApply">Apply &amp; re‑run</button>
         <button id="btnDefaults">Reset to defaults</button>
         <button id="btnCloseSettings">Close</button>
       </div>
@@ -595,7 +591,7 @@
           <button id="btnFinish">Run to end</button>
           <button id="btnReset">Reset</button>
           <span class="speed-label">Speed</span>
-          <input type="range" id="speed" min="1" max="12" value="4" step="1">
+          <input type="range" id="speed" min="1" max="12" value="2" step="1">
         </div>
       </div>
       <div class="side">
@@ -627,10 +623,10 @@
       Model: node <code>i</code> always steers directly toward the current position of node <code>i+1</code> at its own
       fixed speed (pure pursuit, as in the book's A→B→C→D chase). The final node in each chain has no target and instead
       sweeps a zigzag heading. All nodes reflect off the window's edges so nobody leaves the field. <b
-        style="color:var(--text)">A collision only deactivates that one chase link — it never stops the simulation.</b>
-      Every other active link keeps moving and can still collide later, and the run always continues until the window's
-      full time has elapsed. The total collision count shown is the count after the complete run, not a running partial
-      count that might still change. Step size (&Delta;t) is fixed within a window for the duration of its run.
+        style="color:var(--text)">A collision only marks that link as 'collided' — it never stops any node from
+        moving.</b>
+      Every node continues to move for the entire duration of the window. The total collision count shown is the count
+      after the complete run. Step size (&Delta;t) is fixed within a window for the duration of its run.
     </div>
   </div>
 
@@ -650,26 +646,27 @@
       };
     }
 
+    // ------------------------------------------------------------
+    // NEW DEFAULTS – designed to show decreasing collisions as window grows
+    // ------------------------------------------------------------
     const DEFAULT_WINDOWS = [
       buildWindowConfig({
-        size: 5, nNodes: 4, totalMinutes: 4, dt: 0.01,
-        velocities: [1.8, 1.6, 1.4, 2.0],
+        size: 5, nNodes: 4, totalMinutes: 2.0, dt: 0.01,
+        velocities: [5.0, 4.5, 4.0, 2.0],
         hitRadius: 0.15, seed: 11,
       }),
       buildWindowConfig({
-        size: 9, nNodes: 5, totalMinutes: 9, dt: 0.015,
-        velocities: [1.5, 1.3, 1.15, 1.0, 1.7],
+        size: 9, nNodes: 4, totalMinutes: 3.5, dt: 0.015,
+        velocities: [5.0, 4.5, 4.0, 2.0],
         hitRadius: 0.18, seed: 22,
       }),
       buildWindowConfig({
-        size: 16, nNodes: 8, totalMinutes: 13, dt: 0.02,
-        velocities: [2.2, 2.0, 1.85, 1.7, 1.55, 1.4, 1.25, 2.5],
+        size: 16, nNodes: 4, totalMinutes: 6.0, dt: 0.02,
+        velocities: [5.0, 4.5, 4.0, 2.0],
         hitRadius: 0.28, seed: 33,
       }),
     ];
 
-    // WINDOWS holds the *live* (possibly user-edited) configuration.
-    // DEFAULT_WINDOWS is never mutated, so "reset to defaults" always works.
     let WINDOWS = DEFAULT_WINDOWS.map(cfg => buildWindowConfig(cfg));
 
     const WINDOW_LABELS = ['5 × 5 window', '9 × 9 window', '16 × 16 window'];
@@ -688,10 +685,7 @@
 
     // ---------------------------------------------------------------------------
     // Core simulation: runs the FULL number of steps regardless of collisions.
-    // A collision only deactivates its own chase link; it never stops the loop,
-    // never stops other links, and the total collision count is only meaningful
-    // once the loop has completed every step up to cfg.steps (i.e. the window's
-    // full total_minutes has elapsed).
+    // A collision only marks that link as 'collided' – it never stops any node.
     // ---------------------------------------------------------------------------
     function runSimulation(cfg) {
       const rand = mulberry32(cfg.seed);
@@ -713,17 +707,18 @@
       const zigAngleBase = rand() * 2 * Math.PI;
       const zigTurnRate = 0.55 + rand() * 0.25;
 
-      const active = new Array(n - 1).fill(true);
+      const collided = new Array(n - 1).fill(false);
       const frames = [];
       const collisionEvents = [];
       let t = 0;
       let collisions = 0;
 
-      frames.push({ t, pos: pos.map(p => p.slice()), active: active.slice(), collisions });
+      frames.push({ t, pos: pos.map(p => p.slice()), collided: collided.slice(), collisions });
 
       for (let s = 0; s < cfg.steps; s++) {
         const newPos = pos.map(p => p.slice());
 
+        // --- move last node (zigzag) ---
         const baseHeading = zigAngleBase + t * zigTurnRate;
         const sway = Math.sin(t * (2 * Math.PI / zigPeriod)) * 1.15;
         const heading = baseHeading + sway;
@@ -731,8 +726,8 @@
         newPos[last][0] += Math.cos(heading) * vLast * cfg.dt;
         newPos[last][1] += Math.sin(heading) * vLast * cfg.dt;
 
+        // --- move all other nodes (chase their target) ---
         for (let i = n - 2; i >= 0; i--) {
-          if (!active[i]) continue;
           const tx = pos[i + 1][0], ty = pos[i + 1][1];
           const dx = tx - pos[i][0], dy = ty - pos[i][1];
           const dist = Math.hypot(dx, dy);
@@ -743,6 +738,7 @@
           newPos[i][1] += uy * v * cfg.dt;
         }
 
+        // --- reflect all nodes to keep them inside the window ---
         for (let i = 0; i < n; i++) {
           for (const k of [0, 1]) {
             if (newPos[i][k] < 0) newPos[i][k] = -newPos[i][k];
@@ -753,21 +749,19 @@
         pos = newPos;
         t += cfg.dt;
 
-        // Collision check never breaks the loop. Each link can only collide
-        // once (it is skipped via `active[i]` afterwards), but every other
-        // link, and the loop itself, keeps going regardless.
+        // --- collision detection (only count each link once) ---
         for (let i = 0; i < n - 1; i++) {
-          if (active[i]) {
+          if (!collided[i]) {
             const d = Math.hypot(pos[i][0] - pos[i + 1][0], pos[i][1] - pos[i + 1][1]);
             if (d <= cfg.hitRadius) {
-              active[i] = false;
+              collided[i] = true;
               collisions++;
               collisionEvents.push({ t, chaserIdx: i, targetIdx: i + 1 });
             }
           }
         }
 
-        frames.push({ t, pos: pos.map(p => p.slice()), active: active.slice(), collisions });
+        frames.push({ t, pos: pos.map(p => p.slice()), collided: collided.slice(), collisions });
       }
 
       return { frames, collisionEvents, totalCollisions: collisions, possibleLinks: n - 1 };
@@ -778,7 +772,7 @@
     let currentWindow = 0;
     let frameIdx = 0;
     let playing = false;
-    let speedMult = 4;
+    let speedMult = 2;  // slower default
     let rafId = null;
     let lastTick = 0;
     let settingsOpen = false;
@@ -881,9 +875,6 @@
       settingsErr.textContent = '';
     }
 
-    // Rebuild the speed-input row whenever the node-count field changes, so the
-    // form always has exactly the right number of editable speeds, pre-filled
-    // with that node's default or its last entered value.
     inNodes.addEventListener('input', () => {
       let n = parseInt(inNodes.value, 10);
       if (isNaN(n)) return;
@@ -1069,8 +1060,9 @@
       }
       ctx.globalAlpha = 1;
 
+      // Draw dashed lines for chase links that have NOT collided yet
       for (let i = 0; i < cfg.nNodes - 1; i++) {
-        if (frame.active[i]) {
+        if (!frame.collided[i]) {
           const p1 = frame.pos[i], p2 = frame.pos[i + 1];
           const [x0, y0] = toPx(p1[0], p1[1]);
           const [x1, y1] = toPx(p2[0], p2[1]);
@@ -1082,16 +1074,17 @@
         }
       }
 
+      // Draw nodes
       for (let i = 0; i < cfg.nNodes; i++) {
         const p = frame.pos[i];
         const [px, py] = toPx(p[0], p[1]);
         const isLast = i === cfg.nNodes - 1;
-        const isDeadChaser = i < cfg.nNodes - 1 && !frame.active[i];
+        const hasCollided = (i < cfg.nNodes - 1) ? frame.collided[i] : false;
 
         ctx.beginPath();
         ctx.arc(px, py, isLast ? 8 : 7, 0, Math.PI * 2);
         ctx.fillStyle = nodeColorHex(i);
-        ctx.globalAlpha = isDeadChaser ? 0.45 : 1;
+        ctx.globalAlpha = hasCollided ? 0.45 : 1;
         ctx.fill();
         ctx.globalAlpha = 1;
         ctx.lineWidth = 2;
@@ -1115,9 +1108,12 @@
       timefillEl.style.width = Math.min(100, pct).toFixed(1) + '%';
       timevalEl.textContent = `${frame.t.toFixed(2)} / ${cfg.totalMinutes.toFixed(2)} min`;
 
+      // Update legend: mark collided links
       for (let i = 0; i < cfg.nNodes - 1; i++) {
         const row = document.getElementById('leg-' + i);
-        if (row) row.classList.toggle('dead', !frame.active[i]);
+        if (row) {
+          row.classList.toggle('dead', frame.collided[i]);
+        }
       }
 
       renderEventsUpTo(frameIdx);

@@ -1,0 +1,520 @@
+CISCO PACKET TRACER - PROBLEM C
+Complete walkthrough: subnetting, router configuration, routing, DNS/HTTP, and testing
+
+IMPORTANT
+---------
+Confirm interface names with `show ip interface brief` before entering commands.
+Packet Tracer custom router modules may use different interface numbering. Use the interface actually connected to each device.
+
+TASK 1 - ADDRESSING PLAN
+========================
+
+1) ISP <--> R1 WAN
+Network: 209.165.201.0/30
+Mask:    255.255.255.252
+ISP Serial: 209.165.201.1 /30
+R1 Serial:  209.165.201.2 /30
+Broadcast:  209.165.201.3
+
+2) ISP <--> Web Server
+Network: 209.165.200.224/30
+Mask:    255.255.255.252
+ISP FastEthernet: 209.165.200.225 /30
+Server:           209.165.200.226 /30
+Server gateway:   209.165.200.225
+Broadcast:        209.165.200.227
+
+3) R1 <--> Branch WANs
+Given: 10.0.1.0/28. Divide into four /30 networks (mask 255.255.255.252):
+
+R1-B1: Network 10.0.1.0/30; R1 10.0.1.1; B1 10.0.1.2; broadcast 10.0.1.3
+R1-B2: Network 10.0.1.4/30; R1 10.0.1.5; B2 10.0.1.6; broadcast 10.0.1.7
+R1-B3: Network 10.0.1.8/30; R1 10.0.1.9; B3 10.0.1.10; broadcast 10.0.1.11
+R1-B4: Network 10.0.1.12/30; R1 10.0.1.13; B4 10.0.1.14; broadcast 10.0.1.15
+
+4) Branch LAN address space
+Divide 10.1.0.0/16 into four /18 branch networks. Mask: 255.255.192.0
+
+B1: 10.1.0.0/18; usable 10.1.0.1 - 10.1.63.254; broadcast 10.1.63.255
+B2: 10.1.64.0/18; usable 10.1.64.1 - 10.1.127.254; broadcast 10.1.127.255
+B3: 10.1.128.0/18; usable 10.1.128.1 - 10.1.191.254; broadcast 10.1.191.255
+B4: 10.1.192.0/18; usable 10.1.192.1 - 10.1.255.254; broadcast 10.1.255.255
+
+5) Each branch LAN
+Divide each /18 into four /20 networks. Mask: 255.255.240.0
+
+B1:
+Fa0/0 - 10.1.0.0/20   Router IP 10.1.0.1
+Fa0/1 - 10.1.16.0/20  Router IP 10.1.16.1
+Fa1/0 - 10.1.32.0/20  Router IP 10.1.32.1
+Fa1/1 - 10.1.48.0/20  Router IP 10.1.48.1
+
+B2:
+Fa0/0 - 10.1.64.0/20   Router IP 10.1.64.1
+Fa0/1 - 10.1.80.0/20   Router IP 10.1.80.1
+Fa1/0 - 10.1.96.0/20   Router IP 10.1.96.1
+Fa1/1 - 10.1.112.0/20  Router IP 10.1.112.1
+
+B3:
+Fa0/0 - 10.1.128.0/20  Router IP 10.1.128.1
+Fa0/1 - 10.1.144.0/20  Router IP 10.1.144.1
+Fa1/0 - 10.1.160.0/20  Router IP 10.1.160.1
+Fa1/1 - 10.1.176.0/20  Router IP 10.1.176.1
+
+B4:
+Fa0/0 - 10.1.192.0/20  Router IP 10.1.192.1
+Fa0/1 - 10.1.208.0/20  Router IP 10.1.208.1
+Fa1/0 - 10.1.224.0/20  Router IP 10.1.224.1
+Fa1/1 - 10.1.240.0/20  Router IP 10.1.240.1
+
+
+TASK 2 - DEVICE SELECTION AND CABLING
+====================================
+- Use required custom-made 2621XM branch routers.
+- Add required serial and FastEthernet modules/interfaces.
+- Cable according to the topology.
+- R1 is DCE for branch serial links; ISP is DCE for ISP-R1.
+- Set clock rate 64000 on DCE serial interfaces.
+- Check interface names: show ip interface brief
+- Check DCE status: show controllers serial
+
+
+TASK 3 - BASIC CONFIGURATION
+============================
+
+Passwords:
+Enable secret = class
+Console password = cisco
+VTY password = cisco
+
+R1 CONFIGURATION (interface names are examples; verify yours)
+------------------------------------------------------------
+enable
+configure terminal
+hostname R1
+enable secret class
+line console 0
+ password cisco
+ login
+exit
+line vty 0 4
+ password cisco
+ login
+exit
+
+interface serial 1/0
+ ip address 209.165.201.2 255.255.255.252
+ clock rate 64000
+ no shutdown
+exit
+
+interface serial 0/0
+ ip address 10.0.1.1 255.255.255.252
+ clock rate 64000
+ no shutdown
+exit
+interface serial 0/1
+ ip address 10.0.1.5 255.255.255.252
+ clock rate 64000
+ no shutdown
+exit
+interface serial 0/2
+ ip address 10.0.1.9 255.255.255.252
+ clock rate 64000
+ no shutdown
+exit
+interface serial 0/3
+ ip address 10.0.1.13 255.255.255.252
+ clock rate 64000
+ no shutdown
+exit
+end
+copy running-config startup-config
+
+
+ISP CONFIGURATION
+-----------------
+enable
+configure terminal
+hostname ISP
+enable secret class
+line console 0
+ password cisco
+ login
+exit
+line vty 0 4
+ password cisco
+ login
+exit
+
+interface serial 0/0
+ ip address 209.165.201.1 255.255.255.252
+ clock rate 64000
+ no shutdown
+exit
+
+interface fastethernet 0/0
+ ip address 209.165.200.225 255.255.255.252
+ no shutdown
+exit
+
+ip route 10.0.1.0 255.255.255.240 serial 0/0
+ip route 10.1.0.0 255.255.0.0 serial 0/0
+end
+copy running-config startup-config
+
+
+BRANCH ROUTER B1
+-----------------
+enable
+configure terminal
+hostname B1
+enable secret class
+line console 0
+ password cisco
+ login
+exit
+line vty 0 4
+ password cisco
+ login
+exit
+interface serial 0/0
+ ip address 10.0.1.2 255.255.255.252
+ no shutdown
+exit
+interface fastethernet 0/0
+ ip address 10.1.0.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 0/1
+ ip address 10.1.16.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 1/0
+ ip address 10.1.32.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 1/1
+ ip address 10.1.48.1 255.255.240.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 serial 0/0
+router rip
+ version 1
+ network 10.0.0.0
+ network 10.1.0.0
+exit
+end
+copy running-config startup-config
+
+
+BRANCH ROUTER B2
+-----------------
+enable
+configure terminal
+hostname B2
+enable secret class
+line console 0
+ password cisco
+ login
+exit
+line vty 0 4
+ password cisco
+ login
+exit
+interface serial 0/0
+ ip address 10.0.1.6 255.255.255.252
+ no shutdown
+exit
+interface fastethernet 0/0
+ ip address 10.1.64.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 0/1
+ ip address 10.1.80.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 1/0
+ ip address 10.1.96.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 1/1
+ ip address 10.1.112.1 255.255.240.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 serial 0/0
+router rip
+ version 1
+ network 10.0.0.0
+ network 10.1.0.0
+exit
+end
+copy running-config startup-config
+
+
+BRANCH ROUTER B3
+-----------------
+enable
+configure terminal
+hostname B3
+enable secret class
+line console 0
+ password cisco
+ login
+exit
+line vty 0 4
+ password cisco
+ login
+exit
+interface serial 0/0
+ ip address 10.0.1.10 255.255.255.252
+ no shutdown
+exit
+interface fastethernet 0/0
+ ip address 10.1.128.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 0/1
+ ip address 10.1.144.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 1/0
+ ip address 10.1.160.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 1/1
+ ip address 10.1.176.1 255.255.240.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 serial 0/0
+router rip
+ version 1
+ network 10.0.0.0
+ network 10.1.0.0
+exit
+end
+copy running-config startup-config
+
+
+BRANCH ROUTER B4
+-----------------
+enable
+configure terminal
+hostname B4
+enable secret class
+line console 0
+ password cisco
+ login
+exit
+line vty 0 4
+ password cisco
+ login
+exit
+interface serial 0/0
+ ip address 10.0.1.14 255.255.255.252
+ no shutdown
+exit
+interface fastethernet 0/0
+ ip address 10.1.192.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 0/1
+ ip address 10.1.208.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 1/0
+ ip address 10.1.224.1 255.255.240.0
+ no shutdown
+exit
+interface fastethernet 1/1
+ ip address 10.1.240.1 255.255.240.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 serial 0/0
+router rip
+ version 1
+ network 10.0.0.0
+ network 10.1.0.0
+exit
+end
+copy running-config startup-config
+
+
+TASK 4 - STATIC AND DEFAULT ROUTING
+===================================
+
+R1: 4 static routes to branch LAN blocks and one default route to ISP.
+Adjust serial interface numbers to actual ports:
+
+enable
+configure terminal
+ip route 10.1.0.0 255.255.192.0 serial 0/0
+ip route 10.1.64.0 255.255.192.0 serial 0/1
+ip route 10.1.128.0 255.255.192.0 serial 0/2
+ip route 10.1.192.0 255.255.192.0 serial 0/3
+ip route 0.0.0.0 0.0.0.0 serial 1/0
+end
+copy running-config startup-config
+
+ISP routes:
+ip route 10.0.1.0 255.255.255.240 serial 0/0
+ip route 10.1.0.0 255.255.0.0 serial 0/0
+
+Each branch router default route:
+ip route 0.0.0.0 0.0.0.0 <serial-interface-to-R1>
+
+
+TASK 5 - RIP V1
+===============
+
+On each branch router:
+router rip
+ version 1
+ network 10.0.0.0
+ network 10.1.0.0
+exit
+
+Verify:
+show ip protocols
+show ip route
+show ip route rip
+
+Route symbols:
+C = directly connected
+R = learned through RIP
+S = static
+S* = static default route
+
+
+TASK 6 - DNS AND HTTP SERVER
+============================
+
+Server Desktop > IP Configuration:
+IP address:      209.165.200.226
+Subnet mask:     255.255.255.252
+Default gateway: 209.165.200.225
+DNS server:      209.165.200.226
+
+Server Services > HTTP:
+Turn HTTP On (HTTPS if required).
+
+Server Services > DNS:
+Turn DNS On.
+Add record:
+Name: pstu.ac.bd
+Address: 209.165.200.226
+Click Add.
+
+
+TASK 7 - PC CONFIGURATION
+=========================
+
+Example PC0 in B1 Fa0/0 LAN:
+IP address:      10.1.0.2
+Subnet mask:     255.255.240.0
+Default gateway: 10.1.0.1
+DNS server:      209.165.200.226
+
+Example PCs in other branches:
+B2 PC: 10.1.64.2 /20, gateway 10.1.64.1
+B3 PC: 10.1.128.2 /20, gateway 10.1.128.1
+B4 PC: 10.1.192.2 /20, gateway 10.1.192.1
+
+Use a unique IP in the correct LAN subnet for each additional PC.
+
+
+TASK 8 - CONNECTIVITY TESTING
+=============================
+
+PC0 > Desktop > Command Prompt:
+ping 10.1.0.1
+ping 209.165.200.225
+ping 209.165.200.226
+ping pstu.ac.bd
+
+DNS:
+ping pstu.ac.bd
+It should resolve to 209.165.200.226.
+
+HTTP:
+PC0 > Desktop > Web Browser
+Open: http://pstu.ac.bd
+
+Traceroute:
+tracert 209.165.200.226
+
+Router verification:
+show ip interface brief
+show ip route
+show running-config
+show ip protocols
+show controllers serial
+
+R1 pings:
+ping 10.0.1.2
+ping 10.0.1.6
+ping 10.0.1.10
+ping 10.0.1.14
+ping 209.165.200.226
+
+B1 pings:
+ping 10.0.1.1
+ping 209.165.201.1
+ping 209.165.200.226
+
+Extended ping from B1:
+B1# ping
+Target IP address: 209.165.200.226
+Extended commands: yes
+Source address or interface: 10.1.0.1
+Press Enter for other default options.
+
+Expected success:
+!!!!!
+Success rate is 100 percent (5/5)
+
+
+TROUBLESHOOTING
+===============
+
+1. Interface down:
+   configure terminal
+   interface <correct-interface>
+   no shutdown
+
+2. Check interfaces:
+   show ip interface brief
+
+3. Serial/DCE:
+   show controllers serial
+   Set clock rate 64000 on DCE end only.
+
+4. PC cannot ping its gateway:
+   Check PC IP, subnet mask, gateway, cable, switch, and router LAN interface.
+
+5. PC can ping gateway but not server:
+   Check branch default route, R1 static/default routes, and ISP static routes.
+
+6. DNS fails:
+   Check DNS service is On, record is pstu.ac.bd -> 209.165.200.226, and PC DNS is 209.165.200.226.
+
+7. HTTP fails:
+   Check HTTP service is On and server IP/gateway are correct.
+
+8. First ping may fail due to ARP. Repeat it.
+
+
+FINAL SAVE AND CHECK
+====================
+
+On every router:
+copy running-config startup-config
+
+In Packet Tracer:
+- Click Check Results.
+- Review incomplete items.
+- Correct interface, addressing, routing, cabling, or service requirements.
+- Test end-to-end connectivity again.
+
+IMPORTANT:
+Interface numbers in this document are examples. Match each address to the actual port connected to the correct neighbor. Do not assign a WAN IP to the wrong serial interface.

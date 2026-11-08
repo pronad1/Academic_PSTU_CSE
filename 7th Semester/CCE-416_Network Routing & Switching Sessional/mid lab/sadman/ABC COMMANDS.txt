@@ -282,7 +282,6 @@ end
 router rip
 version 1
 network 10.0.0.0
-network 209.165.200.0
 end
 
 
@@ -290,5 +289,4 @@ router rip
 version 2
 no auto-summary
 network 10.0.0.0
-network 209.165.200.0
 end

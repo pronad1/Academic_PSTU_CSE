@@ -1,0 +1,11 @@
+Introduction to Automata Theory, Languages, and Computation Solutions to Selected Exercises
+
+http://infolab.stanford.edu/~ullman/ialcsols/sols.html
+
+====================================================================
+
+Compilers Principles, Techniques, & Tools (purple dragon book) second edition exercise answers
+
+https://dragon-book.jcf94.com/book/index.html
+
+https://github.com/alirezasamar/Dragon-Book-Solutions/blob/master/ch02/2.2/2.2.md

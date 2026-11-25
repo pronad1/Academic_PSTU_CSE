@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Compiler Lens – Compiler Front-End Analyzer and Visualizer Studio</title>
+<style>
+:root{--bg:#fafaf7;--fg:#1d2330;--card:#fff;--line:#d9dce3;--acc:#2f5fd0;--bad:#c0392b;--ok:#1e8449;--mut:#6b7280;--leaf:#b45309;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171f;--fg:#e6e8ee;--card:#1c202b;--line:#333a4a;--acc:#7aa2ff;--bad:#ff7b6b;--ok:#52d273;--mut:#9aa3b5;--leaf:#f0b45a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171f;--fg:#e6e8ee;--card:#1c202b;--line:#333a4a;--acc:#7aa2ff;--bad:#ff7b6b;--ok:#52d273;--mut:#9aa3b5;--leaf:#f0b45a;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:.2em 0}h2{font-size:1.05rem;margin:0 0 8px;color:var(--acc)}
+.sub{color:var(--mut);margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.row{grid-template-columns:1fr}}
+textarea,input,select{width:100%;box-sizing:border-box;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font:14px ui-monospace,Menlo,Consolas,monospace}
+textarea{height:150px}label{font-size:.85rem;color:var(--mut)}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 18px;font-size:15px;cursor:pointer;margin-top:10px}
+pre{margin:0;white-space:pre-wrap;font:14px ui-monospace,Menlo,Consolas,monospace}
+.sc{overflow-x:auto}table{border-collapse:collapse;font:13px ui-monospace,Menlo,Consolas,monospace}
+th,td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top;white-space:nowrap}th{background:var(--bg)}
+.bad{color:var(--bad);font-weight:600}.ok{color:var(--ok);font-weight:600}.mut{color:var(--mut)}.err{color:var(--bad)}
+.log li{margin:2px 0}
+[hidden]{display:none!important}
+.pipe{font-weight:600}code{font:13px ui-monospace,Menlo,Consolas,monospace}
+</style></head><body><main>
+<h1>Compiler Lens</h1><p class="sub">An interactive compiler front-end analyzer and visualizer studio · Chapters 1–2 · Aho, Lam, Sethi, Ullman</p>
+<section id="p1"><div class="card"><div class="row"><div><label>Source code (simplified C-like language: int/float declarations, assignment, expressions, if/else, while)</label><textarea id="src" spellcheck="false" style="height:210px"></textarea></div><div><label>Examples</label><select id="ex1"></select><button id="go1">Compile</button><p class="mut">Lexical analysis → recursive-descent parsing with panic-mode recovery (4.1.4) → symbol table → syntax tree → postfix → three-address code.</p></div></div></div><div id="o1"></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tbl=(h,rows)=>`<div class="sc"><table><tr>${h.map(x=>`<th>${esc(x)}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`;
+const card=(t,b)=>`<div class="card"><h2>${t}</h2>${b}</div>`;
+
+function treeSvg(root){
+  let leaf=0,maxD=0;
+  (function lay(n,d){n.d=d;maxD=Math.max(maxD,d);
+    if(!n.c.length)n.x=leaf++;else{n.c.forEach(c=>lay(c,d+1));n.x=(n.c[0].x+n.c[n.c.length-1].x)/2;}})(root,0);
+  const W=Math.max(leaf,1)*64+20,H=(maxD+1)*64+20;let l='',nd='';
+  (function dr(n){const x=n.x*64+42,y=n.d*64+34;
+    n.c.forEach(c=>{l+=`<line x1="${x}" y1="${y}" x2="${c.x*64+42}" y2="${c.d*64+34}" stroke="var(--line)" stroke-width="1.5"/>`;dr(c);});
+    const t=!n.c.length;
+    nd+=`<circle cx="${x}" cy="${y}" r="20" fill="var(--card)" stroke="${t?'var(--leaf)':'var(--acc)'}" stroke-width="1.5"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="12" fill="var(--fg)">${esc(n.s)}</text>`;})(root);
+  return `<div class="sc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${l}${nd}</svg></div>`;
+}
+
+/* Chapters 1–2: mini-language front end */
+const KW=new Set(['int','float','if','else','while']);
+function lex(src){                        // Section 2.6
+  const re=/\s+|\/\/[^\n]*|([A-Za-z_]\w*)|(\d+(?:\.\d+)?)|(==|!=|<=|>=|[-+*\/=<>(){};])|([^])/y,toks=[],errs=[];
+  let line=1,col=1,m;
+  while(re.lastIndex<src.length&&(m=re.exec(src))){
+    const x=m[0],p={l:line,c:col};
+    if(m[1])toks.push({...p,t:KW.has(x)?'KEYWORD':'ID',v:x});
+    else if(m[2])toks.push({...p,t:'NUM',v:x});
+    else if(m[3])toks.push({...p,t:/[(){};]/.test(x)?'PUNCT':'OP',v:x});
+    else if(m[4])errs.push(`Lexical error at ${line}:${col}: illegal character "${x}"`);
+    for(const ch of x)ch==='\n'?(line++,col=1):col++;
+  }
+  toks.push({l:line,c:col,t:'EOF',v:'$'});
+  return{toks,errs};
+}
+function parseProgram(toks){              // recursive descent (2.4) + symbol table (2.7)
+  let p=0;const errs=[],syms=[],scopes=[new Map()];
+  const fail=exp=>{const t=toks[p];throw{msg:`Syntax error at ${t.l}:${t.c}: expected ${exp} but found ${t.t==='EOF'?'end of input':'"'+t.v+'"'}`,fix:`Insert or correct ${exp} near line ${t.l}.`};};
+  const eat=v=>{if(toks[p].v!==v)fail('"'+v+'"');return toks[p++];};
+  const declare=(n,type,t)=>{const sc=scopes[scopes.length-1];
+    if(sc.has(n))errs.push({msg:`Semantic error at ${t.l}:${t.c}: "${n}" is already declared in this scope`,fix:`Remove or rename the second declaration of ${n}.`});
+    else{sc.set(n,type);syms.push({n,type,sc:scopes.length-1,l:t.l});}};
+  const used=t=>{if(!scopes.some(s=>s.has(t.v)))errs.push({msg:`Semantic error at ${t.l}:${t.c}: undeclared variable "${t.v}"`,fix:`Declare ${t.v} before using it.`});};
+  function factor(){const t=toks[p];
+    if(t.t==='NUM'){p++;return{s:t.v,c:[]};}
+    if(t.t==='ID'){p++;used(t);return{s:t.v,c:[]};}
+    if(t.v==='('){p++;const e=expr();eat(')');return e;}
+    fail('an identifier, a number or "("');}
+  function term(){let n=factor();while(toks[p].v==='*'||toks[p].v==='/'){const o=toks[p++].v;n={s:o,c:[n,factor()]};}return n;}
+  function expr(){let n=term();while(toks[p].v==='+'||toks[p].v==='-'){const o=toks[p++].v;n={s:o,c:[n,term()]};}return n;}
+  function cond(){const a=expr(),t=toks[p];if(!['==','!=','<','>','<=','>='].includes(t.v))fail('a relational operator');p++;return{s:t.v,c:[a,expr()]};}
+  function stmt(){const t=toks[p];
+    if(t.v==='int'||t.v==='float'){p++;const id=toks[p];if(id.t!=='ID')fail('an identifier');p++;declare(id.v,t.v,id);
+      const c=[{s:t.v,c:[]},{s:id.v,c:[]}];if(toks[p].v==='='){p++;c.push(expr());}eat(';');return{k:'decl',s:'decl',c,id:id.v};}
+    if(t.t==='ID'){p++;used(t);eat('=');const e=expr();eat(';');return{k:'asg',s:'=',c:[{s:t.v,c:[]},e],id:t.v};}
+    if(t.v==='if'){p++;eat('(');const c=cond();eat(')');const k=[c,block()];if(toks[p].v==='else'){p++;k.push(block());}return{k:'if',s:'if',c:k};}
+    if(t.v==='while'){p++;eat('(');const c=cond();eat(')');return{k:'while',s:'while',c:[c,block()]};}
+    if(t.v==='{')return block();
+    fail('a statement');}
+  function block(){
+    if(toks[p].v!=='{')return stmt();
+    p++;scopes.push(new Map());const c=[];
+    while(toks[p].v!=='}'&&toks[p].t!=='EOF')c.push(guard());
+    eat('}');scopes.pop();return{k:'blk',s:'blk',c};}
+  function guard(){const s0=p;                // panic-mode recovery (4.1.4)
+    try{return stmt();}catch(e){if(!e.msg)throw e;errs.push(e);
+      while(toks[p].t!=='EOF'&&toks[p].v!==';'&&toks[p].v!=='}')p++;
+      if(toks[p].v===';')p++;else if(p===s0)p++;
+      return{k:'err',s:'error',c:[]};}}
+  const c=[];while(toks[p].t!=='EOF')c.push(guard());
+  return{tree:{k:'prog',s:'prog',c},errs,syms};
+}
+const pfx=n=>n.c.length?pfx(n.c[0])+' '+pfx(n.c[1])+' '+n.s:n.s;
+function genTAC(tree){                    // Section 2.8.4
+  const L=[],pf=[];let t=0,l=0;const T=()=>'t'+ ++t,Lb=()=>'L'+ ++l;
+  const ex=n=>{if(!n.c.length)return n.s;const a=ex(n.c[0]),b=ex(n.c[1]),r=T();L.push(`${r} = ${a} ${n.s} ${b}`);return r;};
+  const st=n=>{switch(n.k){
+    case 'prog':case 'blk':n.c.forEach(st);break;
+    case 'decl':if(n.c[2]){const r=ex(n.c[2]);L.push(`${n.id} = ${r}`);pf.push(`${n.id} ${pfx(n.c[2])} =`);}break;
+    case 'asg':{const r=ex(n.c[1]);L.push(`${n.id} = ${r}`);pf.push(`${n.id} ${pfx(n.c[1])} =`);break;}
+    case 'if':{const c=ex(n.c[0]),a=Lb();L.push(`ifFalse ${c} goto ${a}`);st(n.c[1]);
+      if(n.c[2]){const b=Lb();L.push(`goto ${b}`,`${a}:`);st(n.c[2]);L.push(`${b}:`);}else L.push(`${a}:`);break;}
+    case 'while':{const a=Lb(),b=Lb();L.push(`${a}:`);const c=ex(n.c[0]);L.push(`ifFalse ${c} goto ${b}`);st(n.c[1]);L.push(`goto ${a}`,`${b}:`);break;}
+  }};
+  st(tree);return{L,pf};
+}
+
+const badge=(n,k)=>`<span class="${k?'bad':'ok'}">${n}: ${k?k+' error(s)':'OK'}</span>`;
+function run1(){
+  try{
+    const {toks,errs:le}=lex($('src').value),{tree,errs,syms}=parseProgram(toks),
+      all=[...le.map(m=>({msg:m,fix:'Remove or replace the illegal character.'})),...errs],cnt=r=>all.filter(e=>r.test(e.msg)).length;
+    let h=card('Compiler phases (Chapter 1)',`<div class="pipe">${badge('Lexical',cnt(/^Lexical/))} → ${badge('Syntax',cnt(/^Syntax/))} → ${badge('Semantic',cnt(/^Semantic/))} → <span class="${all.length?'mut':'ok'}">Code generation: ${all.length?'blocked until errors are fixed':'done'}</span></div>`);
+    h+=card('1 · Lexical analysis: tokens (Section 2.6, Ch. 3)',tbl(['#','Token','Lexeme','Line:Col'],toks.filter(x=>x.t!=='EOF').map((x,i)=>[i+1,x.t,`<code>${esc(x.v)}</code>`,x.l+':'+x.c])));
+    h+=card('2 · Symbol table (Section 2.7)',syms.length?tbl(['Name','Type','Scope level','Declared at line'],syms.map(s=>[esc(s.n),s.type,s.sc,s.l])):'<p class="mut">No declarations.</p>');
+    h+=card('3 · Diagnostics (static checking 2.8.3, error handling 4.1.3)',all.length?tbl(['Message','Suggested correction'],all.map(e=>[esc(e.msg),esc(e.fix)])):'<p class="ok">✔ No lexical, syntax or semantic errors.</p>');
+    if(!all.length){const g=genTAC(tree);
+      h+=card('4 · Syntax tree (Section 2.8.2)',treeSvg(tree));
+      h+=card('5 · Postfix notation (Section 2.3.1)',`<pre>${esc(g.pf.join('\n'))||'–'}</pre>`);
+      h+=card('6 · Three-address code (Section 2.8.4)',`<pre>${esc(g.L.join('\n'))}</pre>`);}
+    $('o1').innerHTML=h;
+  }catch(e){$('o1').innerHTML=`<div class="card"><p class="err">${esc(e.message||e.msg)}</p></div>`;}
+}
+const EX1=[
+['Undeclared variable (from the sample report)','int a = 10;\nint b = 20;\nint c;\nc = a + b * 2;\nif (c > 30) {\n  d = c - 5;\n}'],
+['Corrected program, with a loop','int a = 10;\nint b = 20;\nint c;\nint d;\nc = a + b * 2;\nif (c > 30) {\n  d = c - 5;\n} else {\n  d = c + 5;\n}\nwhile (a < b) {\n  a = a + 1;\n}'],
+['Syntax error (missing semicolon)','int x = 5\nx = x + 1;'],
+['Lexical error (illegal character)','int a = 5 @ 3;'],
+['Scope and redeclaration','int a = 1;\nint a = 2;\n{ int b = a; }\nb = 3;']];
+$('ex1').innerHTML=EX1.map((e,i)=>`<option value="${i}">${esc(e[0])}</option>`).join('');
+$('ex1').onchange=e=>{$('src').value=EX1[e.target.value][1];run1();};$('go1').onclick=run1;$('src').value=EX1[0][1];run1();
+</script></body></html>

@@ -1,0 +1,11 @@
+# Grammar Lab examples (paste into the Grammar Lab tab)
+# 1. Left-recursive expression grammar, input: id + id * id
+E -> E + T | T
+T -> T * F | F
+F -> ( E ) | id
+
+# 2. Dangling else (conflict at M[S', e]), input: i b t a
+S -> i E t S | i E t S e S | a
+E -> b
+
+# Regex examples (Regex to DFA tab): (a|b)*abb  with  babb

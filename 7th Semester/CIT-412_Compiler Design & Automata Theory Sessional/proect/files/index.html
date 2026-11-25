@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Compiler Lens – Compiler Front-End Analyzer and Visualizer Studio</title>
+<style>
+:root{--bg:#fafaf7;--fg:#1d2330;--card:#fff;--line:#d9dce3;--acc:#2f5fd0;--bad:#c0392b;--ok:#1e8449;--mut:#6b7280;--leaf:#b45309;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171f;--fg:#e6e8ee;--card:#1c202b;--line:#333a4a;--acc:#7aa2ff;--bad:#ff7b6b;--ok:#52d273;--mut:#9aa3b5;--leaf:#f0b45a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171f;--fg:#e6e8ee;--card:#1c202b;--line:#333a4a;--acc:#7aa2ff;--bad:#ff7b6b;--ok:#52d273;--mut:#9aa3b5;--leaf:#f0b45a;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:.2em 0}h2{font-size:1.05rem;margin:0 0 8px;color:var(--acc)}
+.sub{color:var(--mut);margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.row{grid-template-columns:1fr}}
+textarea,input,select{width:100%;box-sizing:border-box;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;font:14px ui-monospace,Menlo,Consolas,monospace}
+textarea{height:150px}label{font-size:.85rem;color:var(--mut)}
+button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 18px;font-size:15px;cursor:pointer;margin-top:10px}
+pre{margin:0;white-space:pre-wrap;font:14px ui-monospace,Menlo,Consolas,monospace}
+.sc{overflow-x:auto}table{border-collapse:collapse;font:13px ui-monospace,Menlo,Consolas,monospace}
+th,td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top;white-space:nowrap}th{background:var(--bg)}
+.bad{color:var(--bad);font-weight:600}.ok{color:var(--ok);font-weight:600}.mut{color:var(--mut)}.err{color:var(--bad)}
+.log li{margin:2px 0}
+[hidden]{display:none!important}nav{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tab{background:var(--card);color:var(--fg);border:1px solid var(--line);margin:0;padding:7px 12px;font-size:14px}.tab.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.pipe{font-weight:600}code{font:13px ui-monospace,Menlo,Consolas,monospace}
+</style></head><body><main>
+<h1>Compiler Lens</h1><p class="sub">An interactive compiler front-end analyzer and visualizer studio · Chapters 1–4 · Aho, Lam, Sethi, Ullman</p><nav id="tabs"></nav>
+<section id="p1"><div class="card"><div class="row"><div><label>Source code (simplified C-like language: int/float declarations, assignment, expressions, if/else, while)</label><textarea id="src" spellcheck="false" style="height:210px"></textarea></div><div><label>Examples</label><select id="ex1"></select><button id="go1">Compile</button><p class="mut">Lexical analysis → recursive-descent parsing with panic-mode recovery (4.1.4) → symbol table → syntax tree → postfix → three-address code.</p></div></div></div><div id="o1"></div></section>
+<section id="p2" hidden><div class="card"><div class="row"><div><label>Regular expression (| alternation, * + ? closure, parentheses; any other character is a symbol, \ escapes)</label><input id="re" spellcheck="false"><label style="display:block;margin-top:10px">Test string</label><input id="rs" spellcheck="false"></div><div><label>Examples</label><select id="ex2"></select><button id="go2">Build automata</button><p class="mut">Thompson construction (3.7.4) → subset construction (3.7.1) → DFA minimization (3.9.6) → simulation.</p></div></div></div><div id="o2"></div></section>
+<section id="p3" hidden><h2 style="font-size:1.2rem;margin:10px 0 0">Grammar Lab · Chapter 4</h2>
+<p class="sub">LL(1) predictive parser studio · Compilers (Aho, Lam, Sethi, Ullman), Chapter 4 · Algorithms 4.19, 4.21, 4.31, 4.34</p>
+<div class="card">
+<div class="row"><div><label>Grammar (one rule per line, symbols separated by spaces, empty alternative = ε)</label><textarea id="g" spellcheck="false"></textarea></div>
+<div><label>Example grammars</label><select id="ex"></select>
+<label style="display:block;margin-top:10px">Input string (terminals; spaces optional)</label><input id="s" spellcheck="false">
+<button id="go">Analyze</button></div></div></div>
+<div id="out"></div>
+<p class="mut">Pipeline: parse grammar → eliminate left recursion → left factoring → FIRST / FOLLOW → LL(1) table → table-driven parse → parse tree.</p></section>
+</main>
+<script>
+/*LOGIC*/
+const EPS='ε';
+function parseGrammar(txt){
+  const R=new Map();let start=null;
+  for(let line of txt.split('\n')){
+    line=line.trim();if(!line||line[0]==='#')continue;
+    const m=line.match(/^(\S+)\s*(?:->|→|=>)\s*(.*)$/);if(!m)throw Error('Bad rule (use  A -> x y | z ): '+line);
+    if(!start)start=m[1];
+    const alts=m[2].split('|').map(s=>s.trim().split(/\s+/).filter(x=>x&&!['ε','eps','epsilon'].includes(x)));
+    R.set(m[1],(R.get(m[1])||[]).concat(alts));
+  }
+  if(!start)throw Error('Please enter a grammar.');
+  return {R,start};
+}
+const prime=(R,A)=>{let p=A+"'";while(R.has(p))p+="'";return p;};
+const tidy=R=>{const k=[...R.keys()],b=x=>x.replace(/'+$/,''),p=x=>k.indexOf(b(x));
+  return new Map(k.map((x,i)=>[x,i]).sort((a,c)=>p(a[0])-p(c[0])||a[1]-c[1]).map(([x])=>[x,R.get(x)]));};
+const fmtAlt=a=>a.join(' ')||EPS;
+function elimLR(G){                       // Algorithm 4.19
+  const R=new Map([...G].map(([k,v])=>[k,v.map(a=>[...a])])),names=[...R.keys()],log=[];
+  for(let i=0;i<names.length;i++){
+    const Ai=names[i];
+    for(let j=0;j<i;j++){
+      const Aj=names[j],out=[];let hit=false;
+      for(const a of R.get(Ai)){
+        if(a[0]===Aj){hit=true;for(const d of R.get(Aj))out.push([...d,...a.slice(1)]);}else out.push(a);
+      }
+      if(hit){R.set(Ai,out);log.push(`Substituted ${Aj} into ${Ai} (indirect recursion).`);}
+    }
+    const rec=R.get(Ai).filter(a=>a[0]===Ai),non=R.get(Ai).filter(a=>a[0]!==Ai);
+    if(rec.length){
+      if(!non.length)throw Error(`${Ai} has only left-recursive alternatives, so it derives nothing.`);
+      const Ap=prime(R,Ai);
+      R.set(Ai,non.map(b=>[...b,Ap]));
+      R.set(Ap,[...rec.map(a=>[...a.slice(1),Ap]),[]]);
+      log.push(`Removed left recursion of ${Ai}; introduced ${Ap}.`);
+    }
+  }
+  return {R:tidy(R),log};
+}
+function leftFactor(R0){                  // Algorithm 4.21
+  const R=new Map([...R0].map(([k,v])=>[k,v.map(a=>[...a])])),log=[];
+  for(let again=true,n=0;again&&n<50;n++){
+    again=false;
+    for(const A of [...R.keys()]){
+      const alts=R.get(A),gr=new Map();
+      for(const a of alts)if(a.length){if(!gr.has(a[0]))gr.set(a[0],[]);gr.get(a[0]).push(a);}
+      const g=[...gr.values()].find(v=>v.length>1);if(!g)continue;
+      let p=1;while(g.every(a=>a.length>p&&a[p]===g[0][p]))p++;
+      const pre=g[0].slice(0,p),Ap=prime(R,A);
+      R.set(A,[...alts.filter(a=>!g.includes(a)),[...pre,Ap]]);
+      R.set(Ap,g.map(a=>a.slice(p)));
+      log.push(`Left-factored ${A} on prefix “${pre.join(' ')}”; introduced ${Ap}.`);
+      again=true;break;
+    }
+  }
+  return {R:tidy(R),log};
+}
+function firstFollow(R,start){            // Section 4.4.2
+  const NT=new Set(R.keys()),F=new Map(),FO=new Map(),N=new Set();
+  NT.forEach(n=>{F.set(n,new Set());FO.set(n,new Set());});
+  const firstSeq=seq=>{const s=new Set();for(const x of seq){
+    if(NT.has(x)){F.get(x).forEach(t=>s.add(t));if(!N.has(x))return{s,nullable:false};}
+    else{s.add(x);return{s,nullable:false};}}return{s,nullable:true};};
+  const add=(set,it)=>{if(set.has(it))return false;set.add(it);return true;};
+  for(let ch=true;ch;){ch=false;
+    for(const [A,alts] of R)for(const a of alts){
+      const {s,nullable}=firstSeq(a);for(const t of s)ch=add(F.get(A),t)||ch;
+      if(nullable&&!N.has(A)){N.add(A);ch=true;}}}
+  FO.get(start).add('$');
+  for(let ch=true;ch;){ch=false;
+    for(const [A,alts] of R)for(const a of alts)for(let i=0;i<a.length;i++){
+      const B=a[i];if(!NT.has(B))continue;
+      const {s,nullable}=firstSeq(a.slice(i+1));
+      for(const t of s)ch=add(FO.get(B),t)||ch;
+      if(nullable)for(const t of FO.get(A))ch=add(FO.get(B),t)||ch;}}
+  return {F,FO,N,NT,firstSeq};
+}
+function buildTable(R,ff){                // Algorithm 4.31
+  const T=new Map();
+  for(const [A,alts] of R)for(const a of alts){
+    const {s,nullable}=ff.firstSeq(a),cols=new Set(s);
+    if(nullable)ff.FO.get(A).forEach(t=>cols.add(t));
+    for(const t of cols){const k=A+'\u0000'+t;if(!T.has(k))T.set(k,[]);T.get(k).push(a);}
+  }
+  return {T,conflicts:[...T].filter(([k,v])=>v.length>1).map(([k])=>k.split('\u0000'))};
+}
+function terminalsOf(R){const NT=new Set(R.keys()),t=new Set();
+  for(const alts of R.values())for(const a of alts)for(const x of a)if(!NT.has(x))t.add(x);return [...t];}
+function tokenize(str,terms){
+  const ts=[...terms].sort((a,b)=>b.length-a.length),out=[];let i=0;
+  while(i<str.length){
+    if(/\s/.test(str[i])){i++;continue;}
+    const t=ts.find(t=>str.startsWith(t,i));
+    if(!t)throw Error(`Lexical error: unknown symbol “${str[i]}” at position ${i+1}.`);
+    out.push(t);i+=t.length;
+  }
+  return out;
+}
+function parseLL1(tokens,R,start,T){      // Algorithm 4.34
+  const NT=new Set(R.keys()),input=[...tokens,'$'],root={s:start,c:[]},stack=[{s:'$',c:[]},root],steps=[];
+  let ip=0;
+  for(let n=0;n<2000;n++){
+    const X=stack[stack.length-1],a=input[ip],row={stack:stack.map(x=>x.s).join(' '),input:input.slice(ip).join(' ')};
+    steps.push(row);
+    if(X.s==='$'){
+      if(a==='$'){row.action='accept';return{steps,root,ok:true};}
+      row.action=`error: extra input “${a}”`;return{steps,root,ok:false,msg:row.action};
+    }
+    if(!NT.has(X.s)){
+      if(X.s===a){row.action='match '+a;stack.pop();ip++;continue;}
+      row.action=`error: expected “${X.s}” but found “${a}”`;return{steps,root,ok:false,msg:row.action};
+    }
+    const e=T.get(X.s+'\u0000'+a);
+    if(!e){row.action=`error: no entry M[${X.s}, ${a}]`;return{steps,root,ok:false,msg:row.action};}
+    const p=e[0];row.action=`${X.s} → ${fmtAlt(p)}`;stack.pop();
+    X.c=p.length?p.map(s=>({s,c:[]})):[{s:EPS,c:[],eps:1}];
+    for(let i=X.c.length-1;i>=0;i--)if(!X.c[i].eps)stack.push(X.c[i]);
+  }
+  return{steps,root,ok:false,msg:'Stopped after 2000 steps (grammar probably left-recursive).'};
+}
+/* Chapters 2–3: mini-language front end */
+const KW=new Set(['int','float','if','else','while']);
+function lex(src){                        // Section 2.6
+  const re=/\s+|\/\/[^\n]*|([A-Za-z_]\w*)|(\d+(?:\.\d+)?)|(==|!=|<=|>=|[-+*\/=<>(){};])|([^])/y,toks=[],errs=[];
+  let line=1,col=1,m;
+  while(re.lastIndex<src.length&&(m=re.exec(src))){
+    const x=m[0],p={l:line,c:col};
+    if(m[1])toks.push({...p,t:KW.has(x)?'KEYWORD':'ID',v:x});
+    else if(m[2])toks.push({...p,t:'NUM',v:x});
+    else if(m[3])toks.push({...p,t:/[(){};]/.test(x)?'PUNCT':'OP',v:x});
+    else if(m[4])errs.push(`Lexical error at ${line}:${col}: illegal character “${x}”`);
+    for(const ch of x)ch==='\n'?(line++,col=1):col++;
+  }
+  toks.push({l:line,c:col,t:'EOF',v:'$'});
+  return{toks,errs};
+}
+function parseProgram(toks){              // recursive descent (2.4) + symbol table (2.7)
+  let p=0;const errs=[],syms=[],scopes=[new Map()];
+  const fail=exp=>{const t=toks[p];throw{msg:`Syntax error at ${t.l}:${t.c}: expected ${exp} but found ${t.t==='EOF'?'end of input':'“'+t.v+'”'}`,fix:`Insert or correct ${exp} near line ${t.l}.`};};
+  const eat=v=>{if(toks[p].v!==v)fail('“'+v+'”');return toks[p++];};
+  const declare=(n,type,t)=>{const sc=scopes[scopes.length-1];
+    if(sc.has(n))errs.push({msg:`Semantic error at ${t.l}:${t.c}: “${n}” is already declared in this scope`,fix:`Remove or rename the second declaration of ${n}.`});
+    else{sc.set(n,type);syms.push({n,type,sc:scopes.length-1,l:t.l});}};
+  const used=t=>{if(!scopes.some(s=>s.has(t.v)))errs.push({msg:`Semantic error at ${t.l}:${t.c}: undeclared variable “${t.v}”`,fix:`Declare ${t.v} before using it.`});};
+  function factor(){const t=toks[p];
+    if(t.t==='NUM'){p++;return{s:t.v,c:[]};}
+    if(t.t==='ID'){p++;used(t);return{s:t.v,c:[]};}
+    if(t.v==='('){p++;const e=expr();eat(')');return e;}
+    fail('an identifier, a number or “(”');}
+  function term(){let n=factor();while(toks[p].v==='*'||toks[p].v==='/'){const o=toks[p++].v;n={s:o,c:[n,factor()]};}return n;}
+  function expr(){let n=term();while(toks[p].v==='+'||toks[p].v==='-'){const o=toks[p++].v;n={s:o,c:[n,term()]};}return n;}
+  function cond(){const a=expr(),t=toks[p];if(!['==','!=','<','>','<=','>='].includes(t.v))fail('a relational operator');p++;return{s:t.v,c:[a,expr()]};}
+  function stmt(){const t=toks[p];
+    if(t.v==='int'||t.v==='float'){p++;const id=toks[p];if(id.t!=='ID')fail('an identifier');p++;declare(id.v,t.v,id);
+      const c=[{s:t.v,c:[]},{s:id.v,c:[]}];if(toks[p].v==='='){p++;c.push(expr());}eat(';');return{k:'decl',s:'decl',c,id:id.v};}
+    if(t.t==='ID'){p++;used(t);eat('=');const e=expr();eat(';');return{k:'asg',s:'=',c:[{s:t.v,c:[]},e],id:t.v};}
+    if(t.v==='if'){p++;eat('(');const c=cond();eat(')');const k=[c,block()];if(toks[p].v==='else'){p++;k.push(block());}return{k:'if',s:'if',c:k};}
+    if(t.v==='while'){p++;eat('(');const c=cond();eat(')');return{k:'while',s:'while',c:[c,block()]};}
+    if(t.v==='{')return block();
+    fail('a statement');}
+  function block(){
+    if(toks[p].v!=='{')return stmt();
+    p++;scopes.push(new Map());const c=[];
+    while(toks[p].v!=='}'&&toks[p].t!=='EOF')c.push(guard());
+    eat('}');scopes.pop();return{k:'blk',s:'blk',c};}
+  function guard(){const s0=p;                // panic-mode recovery (4.1.4)
+    try{return stmt();}catch(e){if(!e.msg)throw e;errs.push(e);
+      while(toks[p].t!=='EOF'&&toks[p].v!==';'&&toks[p].v!=='}')p++;
+      if(toks[p].v===';')p++;else if(p===s0)p++;
+      return{k:'err',s:'error',c:[]};}}
+  const c=[];while(toks[p].t!=='EOF')c.push(guard());
+  return{tree:{k:'prog',s:'prog',c},errs,syms};
+}
+const pfx=n=>n.c.length?pfx(n.c[0])+' '+pfx(n.c[1])+' '+n.s:n.s;
+function genTAC(tree){                    // Section 2.8.4
+  const L=[],pf=[];let t=0,l=0;const T=()=>'t'+ ++t,Lb=()=>'L'+ ++l;
+  const ex=n=>{if(!n.c.length)return n.s;const a=ex(n.c[0]),b=ex(n.c[1]),r=T();L.push(`${r} = ${a} ${n.s} ${b}`);return r;};
+  const st=n=>{switch(n.k){
+    case 'prog':case 'blk':n.c.forEach(st);break;
+    case 'decl':if(n.c[2]){const r=ex(n.c[2]);L.push(`${n.id} = ${r}`);pf.push(`${n.id} ${pfx(n.c[2])} =`);}break;
+    case 'asg':{const r=ex(n.c[1]);L.push(`${n.id} = ${r}`);pf.push(`${n.id} ${pfx(n.c[1])} =`);break;}
+    case 'if':{const c=ex(n.c[0]),a=Lb();L.push(`ifFalse ${c} goto ${a}`);st(n.c[1]);
+      if(n.c[2]){const b=Lb();L.push(`goto ${b}`,`${a}:`);st(n.c[2]);L.push(`${b}:`);}else L.push(`${a}:`);break;}
+    case 'while':{const a=Lb(),b=Lb();L.push(`${a}:`);const c=ex(n.c[0]);L.push(`ifFalse ${c} goto ${b}`);st(n.c[1]);L.push(`goto ${a}`,`${b}:`);break;}
+  }};
+  st(tree);return{L,pf};
+}
+/* Chapter 3: regex -> NFA -> DFA -> minimal DFA */
+function thompson(re){
+  const S=[],al=new Set(),ns=()=>(S.push({e:[],t:[]}),S.length-1),E=(a,b)=>S[a].e.push(b);let i=0;
+  const lit=c=>{const s=ns(),f=ns();al.add(c);S[s].t.push([c,f]);return{s,f};};
+  function alt(){let a=cat();while(re[i]==='|'){i++;const b=cat(),s=ns(),f=ns();E(s,a.s);E(s,b.s);E(a.f,f);E(b.f,f);a={s,f};}return a;}
+  function cat(){let a=null;while(i<re.length&&re[i]!=='|'&&re[i]!==')'){const b=post();if(a){E(a.f,b.s);a={s:a.s,f:b.f};}else a=b;}
+    if(!a){const s=ns(),f=ns();E(s,f);a={s,f};}return a;}
+  function post(){let a=atom();while('*+?'.includes(re[i]||'#')){const o=re[i++],s=ns(),f=ns();E(s,a.s);if(o!=='+')E(s,f);E(a.f,f);if(o!=='?')E(a.f,a.s);a={s,f};}return a;}
+  function atom(){const c=re[i++];if(c==='('){const a=alt();if(re[i++]!==')')throw Error('Missing “)” in the regular expression');return a;}
+    if('*+?|)'.includes(c))throw Error(`Unexpected “${c}” in the regular expression`);return lit(c==='\\'?re[i++]:c);}
+  const a=alt();if(i<re.length)throw Error('Unmatched “)” in the regular expression');
+  return{S,s:a.s,f:a.f,alpha:[...al].sort()};
+}
+function toDFA(N,alpha){                  // subset construction
+  const clo=s0=>{const st=[...s0],r=new Set(s0);while(st.length){const x=st.pop();for(const y of N.S[x].e)if(!r.has(y)){r.add(y);st.push(y);}}return r;};
+  const key=s=>[...s].sort((a,b)=>a-b).join(','),mv=(s,c)=>{const r=new Set();for(const x of s)for(const [a,y] of N.S[x].t)if(a===c)r.add(y);return r;};
+  const st0=clo(new Set([N.s])),D=[{set:st0,t:{}}],idx=new Map([[key(st0),0]]);
+  for(let i=0;i<D.length;i++)for(const c of alpha){
+    const u=clo(mv(D[i].set,c));if(!u.size)continue;const k=key(u);
+    if(!idx.has(k)){idx.set(k,D.length);D.push({set:u,t:{}});}D[i].t[c]=idx.get(k);}
+  D.forEach(d=>d.acc=d.set.has(N.f));return D;
+}
+function minimize(D,alpha){               // partition refinement
+  let g=D.map(d=>d.acc?1:0),cnt=new Set(g).size;
+  for(;;){const m=new Map(),ng=D.map((d,i)=>{const s=g[i]+'|'+alpha.map(c=>d.t[c]===undefined?-1:g[d.t[c]]).join(',');if(!m.has(s))m.set(s,m.size);return m.get(s);});
+    g=ng;if(m.size===cnt)break;cnt=m.size;}
+  const M=Array.from({length:cnt},()=>({t:{},acc:false,from:[]}));
+  D.forEach((d,i)=>{const m=M[g[i]];m.acc=d.acc;m.from.push(i);for(const c of alpha)if(d.t[c]!==undefined)m.t[c]=g[d.t[c]];});
+  return M;
+}
+function runDFA(M,s){let q=0;const tr=['start at q0'];
+  for(const ch of s){const n=M[q].t[ch];if(n===undefined)return{ok:false,msg:`no transition from q${q} on “${ch}”`,tr};tr.push(`q${q} --${ch}--> q${n}`);q=n;}
+  return{ok:M[q].acc,tr};}
+/*END LOGIC*/
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const showG=R=>[...R].map(([A,alts])=>`${esc(A)} → ${alts.map(a=>esc(fmtAlt(a))).join(' | ')}`).join('\n');
+const tbl=(h,rows)=>`<div class="sc"><table><tr>${h.map(x=>`<th>${esc(x)}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`;
+const card=(t,b)=>`<div class="card"><h2>${t}</h2>${b}</div>`;
+const logHtml=l=>l.length?`<ul class="log">${l.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<p class="mut">Nothing to change.</p>';
+const set=s=>'{ '+[...s].map(esc).join(', ')+' }';
+
+function treeSvg(root){
+  let leaf=0,maxD=0;
+  (function lay(n,d){n.d=d;maxD=Math.max(maxD,d);
+    if(!n.c.length)n.x=leaf++;else{n.c.forEach(c=>lay(c,d+1));n.x=(n.c[0].x+n.c[n.c.length-1].x)/2;}})(root,0);
+  const W=Math.max(leaf,1)*64+20,H=(maxD+1)*64+20;let l='',nd='';
+  (function dr(n){const x=n.x*64+42,y=n.d*64+34;
+    n.c.forEach(c=>{l+=`<line x1="${x}" y1="${y}" x2="${c.x*64+42}" y2="${c.d*64+34}" stroke="var(--line)" stroke-width="1.5"/>`;dr(c);});
+    const t=!n.c.length;
+    nd+=`<circle cx="${x}" cy="${y}" r="20" fill="var(--card)" stroke="${t?'var(--leaf)':'var(--acc)'}" stroke-width="1.5"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="12" fill="var(--fg)">${esc(n.s)}</text>`;})(root);
+  return `<div class="sc"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${l}${nd}</svg></div>`;
+}
+
+function run(){
+  const out=$('out');
+  try{
+    const G=parseGrammar($('g').value);
+    const lr=elimLR(G.R),lf=leftFactor(lr.R),R=lf.R,ff=firstFollow(R,G.start),{T,conflicts}=buildTable(R,ff);
+    const terms=terminalsOf(R),cols=[...terms,'$'];
+    let h=card('1 · Grammar as entered',`<pre>${showG(G.R)}</pre>`);
+    h+=card('2 · After eliminating left recursion (Alg. 4.19)',logHtml(lr.log)+`<pre>${showG(lr.R)}</pre>`);
+    h+=card('3 · After left factoring (Alg. 4.21)',logHtml(lf.log)+`<pre>${showG(R)}</pre>`);
+    h+=card('4 · FIRST and FOLLOW',tbl(['Nonterminal','Nullable','FIRST','FOLLOW'],
+      [...R.keys()].map(A=>[esc(A),ff.N.has(A)?'yes':'no',set(ff.F.get(A)),set(ff.FO.get(A))])));
+    const rows=[...R.keys()].map(A=>[`<b>${esc(A)}</b>`,...cols.map(t=>{const e=T.get(A+'\u0000'+t);
+      return e?`<span class="${e.length>1?'bad':''}">${e.map(a=>esc(A+' → '+fmtAlt(a))).join('<br>')}</span>`:'';})]);
+    h+=card('5 · LL(1) predictive parsing table (Alg. 4.31)',
+      (conflicts.length?`<p class="bad">Not LL(1): ${conflicts.length} conflict(s) at ${conflicts.map(c=>`M[${esc(c[0])}, ${esc(c[1])}]`).join(', ')}. The parser uses the first production in a conflicting cell.</p>`
+       :'<p class="ok">✔ The grammar is LL(1): no cell has more than one production.</p>')+tbl(['M',...cols],rows));
+    const s=$('s').value;
+    if(s.trim()){
+      const toks=tokenize(s,terms),r=parseLL1(toks,R,G.start,T);
+      h+=card('6 · Table-driven parse (Alg. 4.34)',`<p class="${r.ok?'ok':'bad'}">${r.ok?'✔ Input accepted':'✘ '+esc(r.msg)}</p>`+
+        tbl(['Step','Stack (top at right)','Input','Action'],r.steps.map((x,i)=>[i+1,esc(x.stack),esc(x.input),esc(x.action)])));
+      h+=card('7 · Parse tree',(r.ok?'':'<p class="mut">Partial tree (parse failed).</p>')+treeSvg(r.root));
+    }
+    out.innerHTML=h;
+  }catch(e){out.innerHTML=`<div class="card"><p class="err">${esc(e.message)}</p></div>`;}
+}
+
+const EX=[
+['Expression grammar (left-recursive)','E -> E + T | T\nT -> T * F | F\nF -> ( E ) | id','id + id * id'],
+['Dangling else (needs left factoring)','S -> i E t S | i E t S e S | a\nE -> b','i b t a'],
+['Indirect recursion, transformation only (Book Ex. 4.20)','S -> A a | b\nA -> A c | S d | ε',''],
+['Non-LL(1) example (conflict)','S -> A | B\nA -> a b\nB -> a c','a c']];
+$('ex').innerHTML=EX.map((e,i)=>`<option value="${i}">${esc(e[0])}</option>`).join('');
+const load=i=>{$('g').value=EX[i][1];$('s').value=EX[i][2];run();};
+$('ex').onchange=e=>load(+e.target.value);$('go').onclick=run;load(0);
+
+const TABS=[['p1','1 · Front-end (Ch. 1–2)'],['p2','2 · Regex → DFA (Ch. 3)'],['p3','3 · Grammar Lab (Ch. 4)']];
+$('tabs').innerHTML=TABS.map(([id,t])=>`<button class="tab" data-p="${id}">${t}</button>`).join('');
+const show=id=>{TABS.forEach(([p])=>{$(p).hidden=p!==id;});document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.p===id));};
+$('tabs').onclick=e=>{if(e.target.dataset.p)show(e.target.dataset.p);};show('p1');
+
+const badge=(n,k)=>`<span class="${k?'bad':'ok'}">${n}: ${k?k+' error(s)':'OK'}</span>`;
+function run1(){
+  try{
+    const {toks,errs:le}=lex($('src').value),{tree,errs,syms}=parseProgram(toks),
+      all=[...le.map(m=>({msg:m,fix:'Remove or replace the illegal character.'})),...errs],cnt=r=>all.filter(e=>r.test(e.msg)).length;
+    let h=card('Compiler phases (Chapter 1)',`<div class="pipe">${badge('Lexical',cnt(/^Lexical/))} → ${badge('Syntax',cnt(/^Syntax/))} → ${badge('Semantic',cnt(/^Semantic/))} → <span class="${all.length?'mut':'ok'}">Code generation: ${all.length?'blocked until errors are fixed':'done'}</span></div>`);
+    h+=card('1 · Lexical analysis: tokens (Section 2.6, Ch. 3)',tbl(['#','Token','Lexeme','Line:Col'],toks.filter(x=>x.t!=='EOF').map((x,i)=>[i+1,x.t,`<code>${esc(x.v)}</code>`,x.l+':'+x.c])));
+    h+=card('2 · Symbol table (Section 2.7)',syms.length?tbl(['Name','Type','Scope level','Declared at line'],syms.map(s=>[esc(s.n),s.type,s.sc,s.l])):'<p class="mut">No declarations.</p>');
+    h+=card('3 · Diagnostics (static checking 2.8.3, error handling 4.1.3)',all.length?tbl(['Message','Suggested correction'],all.map(e=>[esc(e.msg),esc(e.fix)])):'<p class="ok">✔ No lexical, syntax or semantic errors.</p>');
+    if(!all.length){const g=genTAC(tree);
+      h+=card('4 · Syntax tree (Section 2.8.2)',treeSvg(tree));
+      h+=card('5 · Postfix notation (Section 2.3.1)',`<pre>${esc(g.pf.join('\n'))||'–'}</pre>`);
+      h+=card('6 · Three-address code (Section 2.8.4)',`<pre>${esc(g.L.join('\n'))}</pre>`);}
+    $('o1').innerHTML=h;
+  }catch(e){$('o1').innerHTML=`<div class="card"><p class="err">${esc(e.message||e.msg)}</p></div>`;}
+}
+const EX1=[
+['Undeclared variable (from the sample report)','int a = 10;\nint b = 20;\nint c;\nc = a + b * 2;\nif (c > 30) {\n  d = c - 5;\n}'],
+['Corrected program, with a loop','int a = 10;\nint b = 20;\nint c;\nint d;\nc = a + b * 2;\nif (c > 30) {\n  d = c - 5;\n} else {\n  d = c + 5;\n}\nwhile (a < b) {\n  a = a + 1;\n}'],
+['Syntax error (missing semicolon)','int x = 5\nx = x + 1;'],
+['Lexical error (illegal character)','int a = 5 @ 3;'],
+['Scope and redeclaration','int a = 1;\nint a = 2;\n{ int b = a; }\nb = 3;']];
+$('ex1').innerHTML=EX1.map((e,i)=>`<option value="${i}">${esc(e[0])}</option>`).join('');
+$('ex1').onchange=e=>{$('src').value=EX1[e.target.value][1];run1();};$('go1').onclick=run1;$('src').value=EX1[0][1];run1();
+
+function run2(){
+  const o=$('o2');
+  try{
+    const N=thompson($('re').value),al=N.alpha,D=toDFA(N,al),M=minimize(D,al),dn=i=>i<26?String.fromCharCode(65+i):'S'+i,
+      mk=(i,a)=>(i===0?'→ ':'')+(a?'* ':''),mkN=(i,a)=>(i===N.s?'→ ':'')+(a?'* ':'');
+    let h=card(`1 · NFA by Thompson construction (${N.S.length} states; → start, * accepting)`,tbl(['State','ε',...al],N.S.map((s,i)=>[mkN(i,i===N.f)+i,s.e.join(', ')||'–',...al.map(c=>s.t.filter(x=>x[0]===c).map(x=>x[1]).join(', ')||'–')])));
+    h+=card(`2 · DFA by subset construction (${D.length} states)`,tbl(['DFA state','NFA states',...al],D.map((d,i)=>[mk(i,d.acc)+dn(i),[...d.set].sort((a,b)=>a-b).join(', '),...al.map(c=>d.t[c]===undefined?'–':dn(d.t[c]))])));
+    h+=card(`3 · Minimized DFA (${M.length} states)`,tbl(['State','Merged DFA states',...al],M.map((m,i)=>[mk(i,m.acc)+'q'+i,m.from.map(dn).join(', '),...al.map(c=>m.t[c]===undefined?'–':'q'+m.t[c])])));
+    const r=runDFA(M,$('rs').value);
+    h+=card('4 · Simulation on the minimized DFA',`<p class="${r.ok?'ok':'bad'}">${r.ok?'✔ accepted':'✘ rejected'}${r.msg?': '+esc(r.msg):''}</p><pre>${esc(r.tr.join('\n'))}</pre>`);
+    o.innerHTML=h;
+  }catch(e){o.innerHTML=`<div class="card"><p class="err">${esc(e.message)}</p></div>`;}
+}
+const EX2=[['Book Example 3.22: (a|b)*abb','(a|b)*abb','babb'],['Identifier: letter (letter|digit)*','(a|b)(a|b|0|1)*','ab01'],['Binary number with optional fraction','(0|1)+(\\.(0|1)+)?','10.01']];
+$('ex2').innerHTML=EX2.map((e,i)=>`<option value="${i}">${esc(e[0])}</option>`).join('');
+const load2=i=>{$('re').value=EX2[i][1];$('rs').value=EX2[i][2];run2();};
+$('ex2').onchange=e=>load2(+e.target.value);$('go2').onclick=run2;load2(0);
+</script></body></html>

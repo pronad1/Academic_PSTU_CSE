@@ -1,0 +1,13 @@
+int a = 10;
+int b = 20;
+int c;
+int d;
+c = a + b * 2;
+if (c > 30) {
+  d = c - 5;
+} else {
+  d = c + 5;
+}
+while (a < b) {
+  a = a + 1;
+}
